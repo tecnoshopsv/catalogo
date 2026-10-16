@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Catálogo Mayorista · TECNOSHOPSV</title>
+<meta name="theme-color" content="#4B1F7A">
+<style>
+  body{margin:0;background:#4B1F7A;color:#fff;font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center}
+  .c b{display:block;font-size:22px;letter-spacing:.5px}.c b span{color:#FFC52E}
+  .c p{opacity:.8;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="c"><b>TECNOSHOP<span>SV</span></b><p id="m">Cargando catálogo…</p></div>
+<script>
+// Esta página trae el catálogo desde Google Apps Script. Los cambios del catálogo se ven aquí solos.
+var API = 'https://script.google.com/macros/s/AKfycbweF6GVeLUBF6zIiUuPS6CsVSzKyabDV1kHrXgehpmQKnXVa40yqGPw6ltA3fjebQCLxw/exec';
+var CLAVE = 'tsv_pagina';
+function mostrar(html){ document.open(); document.write(html); document.close(); }
+var guardada = null;
+try { guardada = localStorage.getItem(CLAVE); } catch (e) {}
+var nueva = fetch(API + '?fn=pagina').then(function(r){ return r.json(); }).then(function(j){
+  if (j && j.html) { try { localStorage.setItem(CLAVE, j.html); } catch (e) {} }
+  return j && j.html;
+});
+if (guardada) {
+  mostrar(guardada);             // abre al instante con la última versión guardada
+} else {
+  nueva.then(function(h){ if (h) mostrar(h); else throw 0; })
+       .catch(function(){ document.getElementById('m').textContent = 'No se pudo cargar. Revisa tu conexión y recarga.'; });
+}
+</script>
+</body>
+</html>
