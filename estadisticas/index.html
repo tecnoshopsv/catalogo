@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Estadísticas · TECNOSHOPSV</title>
+<meta name="theme-color" content="#4B1F7A">
+<style>
+  :root{ --morado:#4B1F7A; --morado-2:#6A2FA8; --amarillo:#FFC52E; --fondo:#F5F3F8; --texto:#1E1A24; --suave:#6B6475; --linea:#E6E1EC; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fondo);color:var(--texto);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  header{background:var(--morado);color:#fff;padding:16px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;font-size:12px;opacity:.85}
+  .salir{border:1px solid rgba(255,255,255,.5);background:none;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
+  .salir[hidden]{display:none}
+  main{max-width:960px;margin:0 auto;padding:12px 16px 40px}
+  .login{max-width:360px;margin:48px auto;background:#fff;border:1px solid var(--linea);border-radius:16px;padding:22px}
+  .login h2{margin:0 0 4px;font-size:18px}
+  .login p{margin:0 0 16px;color:var(--suave);font-size:13px}
+  .login input[type=password]{width:100%;padding:12px;border:1px solid var(--linea);border-radius:10px;font-size:16px}
+  .login input[type=password]:focus{outline:2px solid var(--morado-2);border-color:transparent}
+  .login label{display:flex;align-items:center;gap:8px;margin:12px 0 16px;font-size:13px;color:var(--suave)}
+  .login button{width:100%;border:0;background:var(--morado);color:#fff;font-weight:700;font-size:15px;border-radius:10px;padding:12px;cursor:pointer}
+  .login button:disabled{opacity:.6;cursor:default}
+  .login .msg{color:#8A1C1C;font-size:13px;margin-top:10px;min-height:18px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 4px}
+  .card{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:12px 14px}
+  .card .k{font-size:12px;color:var(--suave)}
+  .card .v{font-size:24px;font-weight:800;color:var(--morado);margin-top:2px;font-variant-numeric:tabular-nums}
+  .card .s{font-size:12px;color:var(--suave)}
+  section{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:14px;margin-top:12px}
+  h2.t{font-size:15px;margin:0 0 10px}
+  .nota{font-size:12px;color:var(--suave);margin:-4px 0 10px}
+  .barras{display:flex;align-items:flex-end;gap:4px;height:150px;padding-top:16px}
+  .barras .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+  .barras .b{width:100%;max-width:34px;background:var(--morado-2);border-radius:4px 4px 0 0;min-height:2px}
+  .barras .b.hoy{background:var(--amarillo)}
+  .barras .n{font-size:11px;font-weight:700;margin-bottom:2px;font-variant-numeric:tabular-nums}
+  .barras .e{font-size:10px;color:var(--suave);margin-top:4px;white-space:nowrap}
+  .barras.horas .e{font-size:9px}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:7px 6px;border-bottom:1px solid var(--linea);text-align:left;vertical-align:top}
+  th{font-size:12px;color:var(--suave);font-weight:600}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .barra-h{height:8px;background:#EFE7F8;border-radius:4px;overflow:hidden;margin-top:4px}
+  .barra-h i{display:block;height:100%;background:var(--morado-2)}
+  .vacio{color:var(--suave);font-size:13px;padding:8px 0}
+  .det{font-size:12px;color:var(--suave)}
+  .err{background:#FDECEC;color:#8A1C1C;border-radius:10px;padding:10px 12px;margin-top:12px}
+  .cargando{text-align:center;color:var(--suave);padding:40px 10px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Estadísticas · TECNOSHOPSV</h1><p id="gen">Acceso privado</p></div>
+  <button class="salir" id="salir" hidden>Cerrar sesión</button>
+</header>
+<main id="app">
+  <form class="login" id="login">
+    <h2>Acceso privado</h2>
+    <p>Escribe tu contraseña para ver las estadísticas del catálogo.</p>
+    <input type="password" id="clave" placeholder="Contraseña" autocomplete="current-password" required>
+    <label><input type="checkbox" id="recordar"> Recordar en este dispositivo</label>
+    <button id="entrar">Entrar</button>
+    <div class="msg" id="msg"></div>
+  </form>
+</main>
+<script>
+var API = 'https://script.google.com/macros/s/AKfycbweF6GVeLUBF6zIiUuPS6CsVSzKyabDV1kHrXgehpmQKnXVa40yqGPw6ltA3fjebQCLxw/exec';
+var GUARDADA = 'tsv_admin';
+var CLAVE = null, timer = null;
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function dinero(n){ return '$' + Number(n||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+var DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+var LOGIN = $('app').innerHTML;
+
+function pedir(clave){
+  // La contraseña va en el cuerpo de la petición (no en el enlace)
+  return fetch(API, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ fn:'estadisticas', clave: clave }) })
+    .then(function(r){ return r.json(); });
+}
+function textoError(e){
+  if (e === 'No autorizado') return 'Contraseña incorrecta.';
+  if (e === 'Bloqueado') return 'Demasiados intentos fallidos. Espera 15 minutos e intenta de nuevo.';
+  return 'No se pudo conectar. Revisa tu internet e intenta de nuevo.';
+}
+
+function mostrarLogin(msg){
+  clearInterval(timer); CLAVE = null;
+  $('app').innerHTML = LOGIN; $('salir').hidden = true; $('gen').textContent = 'Acceso privado';
+  if (msg) $('msg').textContent = msg;
+  $('login').addEventListener('submit', entrar);
+  $('clave').focus();
+}
+function entrar(ev){
+  ev.preventDefault();
+  var clave = $('clave').value, recordar = $('recordar').checked;
+  $('entrar').disabled = true; $('entrar').textContent = 'Entrando…'; $('msg').textContent = '';
+  pedir(clave).then(function(r){
+    if (r && r.error) { $('entrar').disabled = false; $('entrar').textContent = 'Entrar'; $('msg').textContent = textoError(r.error); return; }
+    try { if (recordar) localStorage.setItem(GUARDADA, clave); else localStorage.removeItem(GUARDADA); } catch (e) {}
+    iniciar(clave, r);
+  }).catch(function(){ $('entrar').disabled = false; $('entrar').textContent = 'Entrar'; $('msg').textContent = textoError(); });
+}
+function iniciar(clave, primeros){
+  CLAVE = clave; $('salir').hidden = false;
+  if (primeros) pintar(primeros); else $('app').innerHTML = '<div class="cargando">Cargando estadísticas…</div>';
+  if (!primeros) cargar();
+  clearInterval(timer); timer = setInterval(cargar, 60000);
+}
+function cargar(){
+  if (!CLAVE) return;
+  pedir(CLAVE).then(function(r){
+    if (r && r.error === 'No autorizado') { try { localStorage.removeItem(GUARDADA); } catch (e) {} mostrarLogin('La contraseña cambió. Escríbela de nuevo.'); return; }
+    if (r && r.error) { $('gen').textContent = textoError(r.error); return; }
+    pintar(r);
+  }).catch(function(){ $('gen').textContent = 'Sin conexión · se reintentará en un minuto'; });
+}
+$('salir').addEventListener('click', function(){ try { localStorage.removeItem(GUARDADA); } catch (e) {} mostrarLogin(); });
+
+function barras(datos, etiqueta, valor, extra){
+  var max = Math.max.apply(null, datos.map(valor).concat([1]));
+  return '<div class="barras ' + (extra || '') + '">' + datos.map(function(d, i){
+    var n = valor(d), h = Math.round(n / max * 100);
+    return '<div class="col" title="' + esc(etiqueta(d, i)) + ': ' + n + '"><div class="n">' + (n || '') + '</div>' +
+      '<div class="b' + (d.hoy ? ' hoy' : '') + '" style="height:' + h + '%"></div><div class="e">' + esc(etiqueta(d, i)) + '</div></div>';
+  }).join('') + '</div>';
+}
+function card(k, v, s){ return '<div class="card"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div><div class="s">' + esc(s) + '</div></div>'; }
+
+function pintar(r){
+  $('gen').textContent = 'Actualizado ' + r.generado + ' · se actualiza solo cada minuto';
+  var h = r.hoy;
+  var html = '<div class="cards">' +
+    card('Visitantes hoy', h.visitantes, h.cargas + ' aperturas del catálogo') +
+    card('Pedidos enviados hoy', h.pedidos, h.unidades + ' equipos') +
+    card('Monto en pedidos hoy', dinero(h.monto), 'según precios del catálogo') +
+    card('Pedidos últimos 30 días', r.total30.pedidos, r.total30.unidades + ' equipos · ' + dinero(r.total30.monto)) +
+  '</div>';
+
+  r.dias.forEach(function(d){ d.hoy = d.dia === r.hoyTxt; });
+  html += '<section><h2 class="t">Visitantes por día (últimos 14 días)</h2><p class="nota">Personas distintas que abrieron el catálogo cada día. Hoy en amarillo.</p>' +
+    barras(r.dias, function(d){ var f = new Date(d.dia + 'T12:00:00'); return DIAS[f.getDay()] + ' ' + f.getDate(); }, function(d){ return d.visitantes; }) + '</section>';
+
+  html += '<section><h2 class="t">Modelos más pedidos y consultados (30 días)</h2><p class="nota">Unidades en pedidos enviados por WhatsApp y consultas de un solo equipo.</p>';
+  if (!r.top.length) html += '<div class="vacio">Todavía no hay pedidos ni consultas registrados.</div>';
+  else {
+    var max = Math.max.apply(null, r.top.map(function(t){ return t.pedido + t.consulta; }).concat([1]));
+    html += '<table><tr><th>Modelo</th><th class="num">En pedidos</th><th class="num">Consultas</th></tr>' + r.top.map(function(t){
+      return '<tr><td>' + esc(t.modelo) + '<div class="barra-h"><i style="width:' + Math.round((t.pedido + t.consulta) / max * 100) + '%"></i></div></td>' +
+        '<td class="num">' + t.pedido + '</td><td class="num">' + t.consulta + '</td></tr>';
+    }).join('') + '</table>';
+  }
+  html += '</section>';
+
+  html += '<section><h2 class="t">¿A qué hora entran tus clientes? (30 días)</h2><p class="nota">Aperturas del catálogo por hora del día (hora de El Salvador).</p>' +
+    barras(r.horas.map(function(n, i){ return { n:n, i:i }; }), function(d){ return d.i % 3 === 0 ? (d.i === 0 ? '12a' : d.i < 12 ? d.i + 'a' : d.i === 12 ? '12p' : (d.i - 12) + 'p') : ''; }, function(d){ return d.n; }, 'horas') + '</section>';
+
+  html += '<section><h2 class="t">Últimos pedidos enviados</h2><p class="nota">Pedidos que los clientes armaron y abrieron en WhatsApp. Confirma en tu WhatsApp si realmente te llegaron.</p>';
+  if (!r.pedidos.length) html += '<div class="vacio">Todavía no hay pedidos.</div>';
+  else html += '<table><tr><th>Fecha</th><th>Detalle</th><th class="num">Equipos</th><th class="num">Total</th></tr>' + r.pedidos.map(function(p){
+    return '<tr><td class="det">' + esc(p.fecha) + '</td><td>' + esc(p.detalle).replace(/ \| /g, '<br>') + '</td><td class="num">' + p.unidades + '</td><td class="num">' + dinero(p.total) + '</td></tr>';
+  }).join('') + '</table>';
+  html += '</section>';
+  $('app').innerHTML = html;
+}
+
+// Si la contraseña quedó recordada en este dispositivo, entrar directo
+var recordada = null; try { recordada = localStorage.getItem(GUARDADA); } catch (e) {}
+if (recordada) iniciar(recordada); else mostrarLogin();
+</script>
+</body>
+</html>
