@@ -18,7 +18,11 @@
 // Esta página trae el catálogo desde Google Apps Script. Los cambios del catálogo se ven aquí solos.
 var API = 'https://script.google.com/macros/s/AKfycbweF6GVeLUBF6zIiUuPS6CsVSzKyabDV1kHrXgehpmQKnXVa40yqGPw6ltA3fjebQCLxw/exec';
 var CLAVE = 'tsv_pagina';
-function mostrar(html){ document.open(); document.write(html); document.close(); }
+function mostrar(html){
+  // Esperar a que esta página termine de cargar; si no, el catálogo se mete dentro de la pantalla "Cargando…" en vez de reemplazarla.
+  function ir(){ document.open(); document.write(html); document.close(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ir); else ir();
+}
 var guardada = null;
 try { guardada = localStorage.getItem(CLAVE); } catch (e) {}
 var nueva = fetch(API + '?fn=pagina').then(function(r){ return r.json(); }).then(function(j){
