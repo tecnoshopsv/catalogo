@@ -63,6 +63,12 @@
   #difTexto{width:100%;min-height:260px;border:1px solid var(--linea);border-radius:10px;padding:10px;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#fff;resize:vertical}
   #difTexto[hidden]{display:none}
   .dif-info{font-size:12px;color:var(--suave);margin-top:6px}
+  .herr .est-sec{margin-top:12px;border-color:#E2D3F3;background:#FAF6FE}
+  .herr .est-sec h2.t{color:var(--morado)}
+  .est-sec .btn.prim{background:var(--morado)}
+  .est-sec .btn.sec{color:var(--morado);border-color:#CDB6EA}
+  #estImg{display:block;width:100%;max-width:280px;border-radius:14px;box-shadow:0 4px 18px rgba(75,31,122,.25);margin-top:4px}
+  #estImg[hidden]{display:none}
   .apilada{width:100%;max-width:34px;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;min-height:2px;background:#EFE7F8}
   .apilada .r{background:var(--morado-2)}
   .apilada .nv{background:var(--amarillo)}
@@ -91,6 +97,24 @@
     </div>
     <textarea id="difTexto" hidden></textarea>
     <div class="dif-info" id="difInfo"></div>
+  </section>
+  <section class="est-sec">
+    <h2 class="t">Imagen para estados e Instagram</h2>
+    <p class="nota">Crea una imagen vertical con tu logo y lo recién llegado o rebajado, lista para subir a tus estados.</p>
+    <div class="dif-ctrl">
+      <select id="estModo">
+        <option value="auto">Recién llegado y rebajas</option>
+        <option value="nuevo">Solo recién llegado</option>
+        <option value="baja">Solo rebajas</option>
+        <option value="todo">Lo más disponible hoy</option>
+      </select>
+      <select id="estMarca"><option value="">Todas las marcas</option><option>iPhone</option><option>Samsung</option></select>
+      <button class="btn sec" id="estGenerar">Crear imagen</button>
+      <button class="btn prim" id="estCompartir" hidden>Compartir</button>
+      <button class="btn sec" id="estBajar" hidden>Descargar imagen</button>
+    </div>
+    <img id="estImg" alt="Vista previa de la imagen para estados" hidden>
+    <div class="dif-info" id="estInfo"></div>
   </section>
 </div>
 <main id="app">
@@ -297,6 +321,166 @@ $('difCopiar').addEventListener('click', function(){
 });
 $('difWA').addEventListener('click', function(){
   window.open('https://wa.me/?text=' + encodeURIComponent($('difTexto').value), '_blank');
+});
+
+// ===== Imagen para estados de WhatsApp / Instagram =====
+var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+var QR_HEX = '1fc24cd7f820bcea0dd542ad76eba156bb74cbc35d827f6b20ff55555fc006cc0003638230cb9478f5e7daaf59bea1205b6ed6c9db6b31d565531bd7c01a37514e45a6620a0f1ddc486bddf9c2cb3603a42e1f0cd4f52ad5414f1b4d71d599e608ae06bb59cd1f000cf5b8f7f6ee7d720985863d7588fbfabada3852dd2c6e06e095b280ffc828f90';
+var LETRA = '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif';
+var estBlob = null;
+function aNum(s){ var n = parseFloat(String(s == null ? '' : s).replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
+function aDolar(n){ var d = Math.round(n * 100) % 100 ? 2 : 0; return '$' + n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function armarEstado(cat, modo, marca){
+  var C = {}; cat.columnas.forEach(function(c, i){ C[c] = i; });
+  var v = function(f, col){ return C[col] === undefined ? '' : String(f[C[col]] || '').trim(); };
+  var ahora = cat.ahora || Date.now(), DIA = 24 * 3600 * 1000;
+  var grupos = {}, orden = [], hayNuevo = false, hayBaja = false;
+  cat.filas.forEach(function(f, i){
+    var mod = v(f,'Modelo'); if (!mod) return;
+    if (marca && marcaDe(mod) !== marca) return;
+    var precio = aNum(v(f,'Precio Venta'));
+    var t = (cat.ingreso && cat.ingreso[i]) || 0, nuevo = !!t && ahora - t < DIA;
+    var antes = aNum(cat.bajas && cat.bajas[i]), baja = antes > 0 && precio > 0 && antes > precio;
+    if ((modo === 'nuevo' && !nuevo) || (modo === 'baja' && !baja) || (modo === 'auto' && !nuevo && !baja)) return;
+    var cab = mod + ' ' + v(f,'Capacidad');
+    if (!grupos[cab]) { grupos[cab] = { titulo: cab, colores: [], cats: [], unid: 0, min: 0, max: 0, nuevo: false, antes: 0, rebajado: 0 }; orden.push(cab); }
+    var g = grupos[cab];
+    var color = v(f,'Color'), cate = v(f,'Categoría');
+    if (color && g.colores.indexOf(color) < 0) g.colores.push(color);
+    if (cate && g.cats.indexOf(cate) < 0) g.cats.push(cate);
+    g.unid++;
+    if (precio) { g.min = g.min ? Math.min(g.min, precio) : precio; g.max = Math.max(g.max, precio); }
+    if (nuevo) { g.nuevo = true; hayNuevo = true; }
+    if (baja && (!g.rebajado || antes - precio > g.antes - g.rebajado)) { g.antes = antes; g.rebajado = precio; hayBaja = true; }
+  });
+  var lista = orden.map(function(k){ return grupos[k]; });
+  if (modo === 'todo') lista.sort(function(a, b){ return b.unid - a.unid; });
+  else lista.sort(function(a, b){ return (b.rebajado ? 1 : 0) - (a.rebajado ? 1 : 0); });
+  var titulo = modo === 'todo' ? 'DISPONIBLE HOY'
+    : (hayNuevo && hayBaja) ? 'NUEVO Y REBAJADO' : hayBaja ? 'BAJARON DE PRECIO' : 'RECIÉN LLEGADOS';
+  return { grupos: lista, titulo: titulo, unid: lista.reduce(function(s, g){ return s + g.unid; }, 0) };
+}
+function cargarLogo(){
+  return new Promise(function(ok){
+    var im = new Image(); im.onload = function(){ ok(im); }; im.onerror = function(){ ok(null); };
+    im.src = '/icono-512.png';
+  });
+}
+function dibujarEstado(d, logo){
+  var W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  var c = cv.getContext('2d');
+  var rr = function(x, y, w, h, r){ c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+  var fuente = function(peso, px){ c.font = peso + ' ' + px + 'px ' + LETRA; };
+  var ajustar = function(t, max){ t = String(t); if (c.measureText(t).width <= max) return t; while (t.length && c.measureText(t + '…').width > max) t = t.slice(0, -1); return t + '…'; };
+  // Fondo
+  var gr = c.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#4B1F7A'); gr.addColorStop(1, '#2C0E4E');
+  c.fillStyle = gr; c.fillRect(0, 0, W, H);
+  c.fillStyle = 'rgba(106,47,168,.45)'; c.beginPath(); c.arc(W - 40, 120, 260, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,197,46,.10)'; c.beginPath(); c.arc(60, 1180, 220, 0, Math.PI * 2); c.fill();
+  // Logo (recorte del ícono; su fondo es el mismo morado)
+  if (logo) {
+    var sw = 340, sh = 214, dw = 540, dh = dw * sh / sw;
+    c.fillStyle = '#4B1F7A'; rr((W - dw) / 2 - 10, 70, dw + 20, dh + 10, 24); c.fill();
+    c.drawImage(logo, 86, 148, sw, sh, (W - dw) / 2, 75, dw, dh);
+  } else { fuente('800', 80); c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText('TecnoShopSV', W / 2, 260); }
+  // Título
+  c.textAlign = 'center'; fuente('900', 60);
+  var tw = c.measureText(d.titulo).width + 90;
+  c.fillStyle = '#FFC52E'; rr((W - tw) / 2, 470, tw, 96, 48); c.fill();
+  c.fillStyle = '#3A2A00'; c.fillText(d.titulo, W / 2, 538);
+  var hoy = new Date();
+  fuente('500', 36); c.fillStyle = 'rgba(255,255,255,.85)';
+  c.fillText(DIAS_LARGO[hoy.getDay()] + ' ' + hoy.getDate() + ' de ' + MESES[hoy.getMonth()] + ' · Precios mayoristas', W / 2, 625);
+  // Tarjetas
+  var y = 668, MAXT = 6, CH = d.grupos.length > MAXT ? 128 : 136, GAP = 16;
+  var mostrar = d.grupos.slice(0, d.grupos.length > MAXT ? MAXT - 1 : MAXT);
+  var alto = mostrar.length * (CH + GAP) + (d.grupos.length > mostrar.length ? 60 : 0);
+  y += Math.max(0, Math.round((1560 - 668 - alto) / 2) - 20);
+  mostrar.forEach(function(g){
+    c.fillStyle = '#FFFFFF'; rr(60, y, W - 120, CH, 26); c.fill();
+    c.textAlign = 'left'; c.fillStyle = '#1E1A24'; fuente('800', 44);
+    c.fillText(ajustar(g.titulo, 590), 96, y + 58);
+    var sub = g.colores.join(', ') + (g.cats.length ? ' · Cat. ' + g.cats.join('/') : '');
+    fuente('500', 29); c.fillStyle = '#6B6475';
+    c.fillText(ajustar(sub, 590), 96, y + CH - 32);
+    // Precio a la derecha
+    c.textAlign = 'right'; var xr = W - 96, precio = g.rebajado || g.min;
+    fuente('900', 56); c.fillStyle = g.rebajado ? '#C62828' : '#4B1F7A';
+    c.fillText(precio ? aDolar(precio) : 'Consultar', xr, y + CH - 30);
+    if (!g.rebajado && g.max > g.min) { var pw = c.measureText(aDolar(precio)).width; fuente('600', 26); c.fillStyle = '#6B6475'; c.fillText('desde', xr - pw - 10, y + CH - 32); }
+    if (g.rebajado) {
+      fuente('600', 28); c.fillStyle = '#6B6475'; var at = 'Antes ' + aDolar(g.antes);
+      c.fillText(at, xr, y + 42);
+      var aw = c.measureText(aDolar(g.antes)).width;
+      c.strokeStyle = '#C62828'; c.lineWidth = 3; c.beginPath(); c.moveTo(xr - aw - 2, y + 32); c.lineTo(xr + 2, y + 32); c.stroke();
+    } else if (g.nuevo) {
+      fuente('800', 24); var nw = c.measureText('NUEVO').width + 28;
+      c.fillStyle = '#FFC52E'; rr(xr - nw, y + 14, nw, 38, 19); c.fill();
+      c.fillStyle = '#3A2A00'; c.textAlign = 'center'; c.fillText('NUEVO', xr - nw / 2, y + 42); c.textAlign = 'right';
+    }
+    y += CH + GAP;
+  });
+  if (d.grupos.length > mostrar.length) {
+    var resto = d.grupos.length - mostrar.length;
+    c.textAlign = 'center'; fuente('700', 38); c.fillStyle = '#FFC52E';
+    c.fillText('+ ' + resto + (resto === 1 ? ' modelo más' : ' modelos más') + ' en el catálogo', W / 2, y + 40);
+  }
+  // Pie con QR al catálogo
+  var py = 1590, ph = 270;
+  c.fillStyle = '#FFFFFF'; rr(60, py, W - 120, ph, 30); c.fill();
+  var bits = QR_HEX.split('').map(function(h){ return ('000' + parseInt(h, 16).toString(2)).slice(-4); }).join('').slice(3);
+  var n = Math.round(Math.sqrt(bits.length)), md = 6, qx = 100, qy = py + (ph - n * md) / 2;
+  c.fillStyle = '#1E1A24';
+  for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (bits.charAt(i * n + j) === '1') c.fillRect(qx + j * md, qy + i * md, md, md);
+  var tx = qx + n * md + 44; c.textAlign = 'left';
+  fuente('600', 32); c.fillStyle = '#6B6475'; c.fillText('Pedidos por WhatsApp', tx, py + 72);
+  fuente('900', 76); c.fillStyle = '#4B1F7A'; c.fillText('7001-2323', tx, py + 150);
+  fuente('800', 30); c.fillStyle = '#6A2FA8'; c.fillText('catalogo.tecnoshopsv.com', tx, py + 200);
+  fuente('500', 25); c.fillStyle = '#6B6475'; c.fillText('Escanea para ver todo el inventario', tx, py + 238);
+  return cv;
+}
+function archivoEstado(){
+  var d = new Date(), p2 = function(n){ return (n < 10 ? '0' : '') + n; };
+  return new File([estBlob], 'estado-tecnoshopsv-' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '.png', { type: 'image/png' });
+}
+$('estGenerar').addEventListener('click', function(){
+  var b = $('estGenerar'), modo = $('estModo').value;
+  b.disabled = true; b.textContent = 'Creando…'; $('estInfo').textContent = '';
+  Promise.all([
+    fetch(API + '?fn=getCatalogo&a=' + encodeURIComponent('[]')).then(function(r){ return r.json(); }),
+    cargarLogo()
+  ]).then(function(r){
+    var res = r[0], cat = JSON.parse(typeof res === 'string' ? res : res.c);
+    var d = armarEstado(cat, modo, $('estMarca').value);
+    if (!d.grupos.length) {
+      $('estInfo').textContent = modo === 'todo' ? 'No hay equipos disponibles con ese filtro.'
+        : 'No hay equipos ' + (modo === 'baja' ? 'rebajados' : modo === 'nuevo' ? 'recién llegados' : 'recién llegados ni rebajados') +
+          ' en las últimas 24 horas. Prueba con «Lo más disponible hoy».';
+      return;
+    }
+    var cv = dibujarEstado(d, r[1]);
+    return new Promise(function(ok){ cv.toBlob(ok, 'image/png'); }).then(function(blob){
+      estBlob = blob;
+      var img = $('estImg'); if (img.src) URL.revokeObjectURL(img.src);
+      img.src = URL.createObjectURL(blob); img.hidden = false;
+      $('estBajar').hidden = false;
+      var puede = false; try { puede = !!(navigator.canShare && navigator.canShare({ files: [archivoEstado()] })); } catch (e) {}
+      $('estCompartir').hidden = !puede;
+      $('estInfo').textContent = d.grupos.length + (d.grupos.length === 1 ? ' modelo' : ' modelos') + ' · ' + d.unid + ' unidades. ' +
+        (puede ? 'Toca «Compartir» y elige WhatsApp o Instagram.' : 'Descárgala y súbela a tu estado.');
+    });
+  }).catch(function(){ $('estInfo').textContent = 'No se pudo crear la imagen. Revisa tu conexión e intenta de nuevo.'; })
+    .then(function(){ b.disabled = false; b.textContent = 'Crear de nuevo'; });
+});
+$('estBajar').addEventListener('click', function(){
+  if (!estBlob) return;
+  var f = archivoEstado(), url = URL.createObjectURL(f), a = document.createElement('a');
+  a.href = url; a.download = f.name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 30000);
+});
+$('estCompartir').addEventListener('click', function(){
+  if (!estBlob) return;
+  navigator.share({ files: [archivoEstado()], title: 'TecnoShopSV' }).catch(function(){});
 });
 
 // Si la contraseña quedó recordada en este dispositivo, entrar directo
