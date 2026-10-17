@@ -50,6 +50,15 @@
   .det{font-size:12px;color:var(--suave)}
   .err{background:#FDECEC;color:#8A1C1C;border-radius:10px;padding:10px 12px;margin-top:12px}
   .cargando{text-align:center;color:var(--suave);padding:40px 10px}
+  .apilada{width:100%;max-width:34px;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;min-height:2px;background:#EFE7F8}
+  .apilada .r{background:var(--morado-2)}
+  .apilada .nv{background:var(--amarillo)}
+  .leyenda{display:flex;gap:14px;font-size:12px;color:var(--suave);margin-top:10px;flex-wrap:wrap}
+  .leyenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .resumen30{font-size:13px;margin-top:10px;padding-top:10px;border-top:1px solid var(--linea)}
+  .resumen30 b{color:var(--morado)}
+  .destacado{border-color:#F3D27A;background:#FFFCF2}
+  .destacado h2.t{color:#5A4300}
 </style>
 </head>
 <body>
@@ -131,20 +140,58 @@ function barras(datos, etiqueta, valor, extra){
 }
 function card(k, v, s){ return '<div class="card"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div><div class="s">' + esc(s) + '</div></div>'; }
 
+function apiladas(dias){
+  var max = Math.max.apply(null, dias.map(function(d){ return d.visitantes; }).concat([1]));
+  return '<div class="barras">' + dias.map(function(d, i){
+    var f = new Date(d.dia + 'T12:00:00'), hoy = i === dias.length - 1;
+    var et = hoy ? 'Hoy' : String(f.getDate()), titulo = hoy ? 'Hoy' : DIAS[f.getDay()] + ' ' + f.getDate();
+    var h = Math.round(d.visitantes / max * 100), pn = d.visitantes ? Math.round(d.nuevos / d.visitantes * 100) : 0;
+    return '<div class="col" title="' + esc(titulo) + ': ' + d.nuevos + ' nuevos, ' + d.regresan + ' regresan"><div class="n">' + (d.visitantes || '') + '</div>' +
+      '<div class="apilada" style="height:' + h + '%"><div class="nv" style="height:' + pn + '%"></div><div class="r" style="flex:1"></div></div>' +
+      '<div class="e">' + esc(et) + '</div></div>';
+  }).join('') + '</div>';
+}
+function plural(n, uno, varios){ return n + ' ' + (n === 1 ? uno : varios); }
+function porcentaje(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
+
 function pintar(r){
   $('gen').textContent = 'Actualizado ' + r.generado + ' · se actualiza solo cada minuto';
-  var h = r.hoy;
+  var h = r.hoy, c = r.clientes30 || { visitantes:0, nuevos:0, regresan:0, compradores:0 };
   var html = '<div class="cards">' +
-    card('Visitantes hoy', h.visitantes, h.cargas + ' aperturas del catálogo') +
-    card('Pedidos enviados hoy', h.pedidos, h.unidades + ' equipos') +
-    card('Monto en pedidos hoy', dinero(h.monto), 'según precios del catálogo') +
+    card('Visitantes hoy', h.visitantes, plural(h.nuevos || 0, 'nuevo', 'nuevos') + ' · ' + plural(h.regresan || 0, 'regresa', 'regresan')) +
+    card('Pedidos enviados hoy', h.pedidos, h.unidades + ' equipos · ' + dinero(h.monto)) +
+    card('Conversión (30 días)', porcentaje(c.compradores, c.visitantes), c.compradores + ' de ' + plural(c.visitantes, 'persona', 'personas') + (c.compradores === 1 ? ' envió pedido' : ' enviaron pedido')) +
     card('Pedidos últimos 30 días', r.total30.pedidos, r.total30.unidades + ' equipos · ' + dinero(r.total30.monto)) +
   '</div>';
 
-  r.dias.forEach(function(d){ d.hoy = d.dia === r.hoyTxt; });
-  html += '<section><h2 class="t">Visitantes por día (últimos 14 días)</h2><p class="nota">Personas distintas que abrieron el catálogo cada día. Hoy en amarillo.</p>' +
-    barras(r.dias, function(d){ var f = new Date(d.dia + 'T12:00:00'); return DIAS[f.getDay()] + ' ' + f.getDate(); }, function(d){ return d.visitantes; }) + '</section>';
+  // 1. Búsquedas sin resultado
+  var sr = r.sinResultado || [];
+  html += '<section class="destacado"><h2 class="t">Lo que buscaron y no encontraron (30 días)</h2><p class="nota">Equipos que tus clientes buscaron cuando no tenías disponibles. Úsalo para decidir qué comprar.</p>';
+  if (!sr.length) html += '<div class="vacio">Todavía no hay búsquedas sin resultado.</div>';
+  else html += '<table><tr><th>Buscaron</th><th class="num">Personas</th><th class="num">Veces</th><th class="num">Última vez</th></tr>' + sr.map(function(b){
+    return '<tr><td>' + esc(b.texto) + '</td><td class="num">' + b.personas + '</td><td class="num">' + b.veces + '</td><td class="num det">' + esc(b.ultima) + '</td></tr>';
+  }).join('') + '</table>';
+  html += '</section>';
 
+  // 2. Modelos más vistos
+  var vs = r.vistos || [];
+  html += '<section><h2 class="t">Modelos más vistos (30 días)</h2><p class="nota">Modelos que los clientes abrieron para ver sus equipos, aunque no hayan pedido.</p>';
+  if (!vs.length) html += '<div class="vacio">Todavía no hay modelos vistos registrados.</div>';
+  else {
+    var mx = Math.max.apply(null, vs.map(function(v){ return v.personas; }).concat([1]));
+    html += '<table><tr><th>Modelo</th><th class="num">Personas</th><th class="num">Veces</th></tr>' + vs.map(function(v){
+      return '<tr><td>' + esc(v.modelo) + '<div class="barra-h"><i style="width:' + Math.round(v.personas / mx * 100) + '%"></i></div></td><td class="num">' + v.personas + '</td><td class="num">' + v.veces + '</td></tr>';
+    }).join('') + '</table>';
+  }
+  html += '</section>';
+
+  // 3. Clientes nuevos vs. que regresan
+  html += '<section><h2 class="t">Visitantes por día: nuevos y los que regresan</h2><p class="nota">Personas distintas que abrieron el catálogo cada día (últimos 14 días).</p>' +
+    apiladas(r.dias) +
+    '<div class="leyenda"><span><i style="background:var(--amarillo)"></i>Nuevos (primera vez)</span><span><i style="background:var(--morado-2)"></i>Ya habían entrado antes</span></div>' +
+    '<div class="resumen30">En los últimos 30 días entraron <b>' + c.visitantes + '</b> personas: <b>' + c.nuevos + '</b> por primera vez y <b>' + c.regresan + '</b> que ya conocían el catálogo.</div></section>';
+
+  // Pedidos y consultas por modelo
   html += '<section><h2 class="t">Modelos más pedidos y consultados (30 días)</h2><p class="nota">Unidades en pedidos enviados por WhatsApp y consultas de un solo equipo.</p>';
   if (!r.top.length) html += '<div class="vacio">Todavía no hay pedidos ni consultas registrados.</div>';
   else {
