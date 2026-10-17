@@ -50,6 +50,19 @@
   .det{font-size:12px;color:var(--suave)}
   .err{background:#FDECEC;color:#8A1C1C;border-radius:10px;padding:10px 12px;margin-top:12px}
   .cargando{text-align:center;color:var(--suave);padding:40px 10px}
+  .herr{max-width:960px;margin:0 auto;padding:12px 16px 0}
+  .herr[hidden]{display:none}
+  .herr section{margin-top:0;border-color:#BDEFD0;background:#F4FCF7}
+  .herr h2.t{color:#0E6B3A}
+  .dif-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .dif-ctrl select{padding:8px;border:1px solid var(--linea);border-radius:8px;background:#fff;font-size:14px}
+  .btn{border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:700;cursor:pointer}
+  .btn.prim{background:#25D366;color:#fff}
+  .btn.sec{background:#fff;color:#0E6B3A;border:1px solid #9EE3BA}
+  .btn:disabled{opacity:.6;cursor:default}
+  #difTexto{width:100%;min-height:260px;border:1px solid var(--linea);border-radius:10px;padding:10px;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#fff;resize:vertical}
+  #difTexto[hidden]{display:none}
+  .dif-info{font-size:12px;color:var(--suave);margin-top:6px}
   .apilada{width:100%;max-width:34px;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;min-height:2px;background:#EFE7F8}
   .apilada .r{background:var(--morado-2)}
   .apilada .nv{background:var(--amarillo)}
@@ -66,6 +79,20 @@
   <div><h1>Estadísticas · TECNOSHOPSV</h1><p id="gen">Acceso privado</p></div>
   <button class="salir" id="salir" hidden>Cerrar sesión</button>
 </header>
+<div class="herr" id="herr" hidden>
+  <section>
+    <h2 class="t">Mensaje de difusión para WhatsApp</h2>
+    <p class="nota">Arma el inventario disponible ahora mismo, listo para pegar en tus grupos, listas de difusión o estados.</p>
+    <div class="dif-ctrl">
+      <select id="difMarca"><option value="">Todas las marcas</option><option>iPhone</option><option>Samsung</option></select>
+      <button class="btn sec" id="difGenerar">Generar mensaje</button>
+      <button class="btn prim" id="difCopiar" hidden>Copiar mensaje</button>
+      <button class="btn sec" id="difWA" hidden>Abrir en WhatsApp</button>
+    </div>
+    <textarea id="difTexto" hidden></textarea>
+    <div class="dif-info" id="difInfo"></div>
+  </section>
+</div>
 <main id="app">
   <form class="login" id="login">
     <h2>Acceso privado</h2>
@@ -99,7 +126,7 @@ function textoError(e){
 
 function mostrarLogin(msg){
   clearInterval(timer); CLAVE = null;
-  $('app').innerHTML = LOGIN; $('salir').hidden = true; $('gen').textContent = 'Acceso privado';
+  $('app').innerHTML = LOGIN; $('salir').hidden = true; $('herr').hidden = true; $('gen').textContent = 'Acceso privado';
   if (msg) $('msg').textContent = msg;
   $('login').addEventListener('submit', entrar);
   $('clave').focus();
@@ -115,7 +142,7 @@ function entrar(ev){
   }).catch(function(){ $('entrar').disabled = false; $('entrar').textContent = 'Entrar'; $('msg').textContent = textoError(); });
 }
 function iniciar(clave, primeros){
-  CLAVE = clave; $('salir').hidden = false;
+  CLAVE = clave; $('salir').hidden = false; $('herr').hidden = false;
   if (primeros) pintar(primeros); else $('app').innerHTML = '<div class="cargando">Cargando estadísticas…</div>';
   if (!primeros) cargar();
   clearInterval(timer); timer = setInterval(cargar, 60000);
@@ -214,6 +241,63 @@ function pintar(r){
   html += '</section>';
   $('app').innerHTML = html;
 }
+
+// ===== Mensaje de difusión =====
+var DIAS_LARGO = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+function marcaDe(m){ return /^iphone/i.test(m) ? 'iPhone' : /^(samsung|galaxy)/i.test(m) ? 'Samsung' : 'Otros'; }
+function precioCorto(p){ return String(p || '').trim().replace(/\.00$/, ''); }
+function armarDifusion(cat, marca){
+  var C = {}; cat.columnas.forEach(function(c, i){ C[c] = i; });
+  var v = function(f, col){ return C[col] === undefined ? '' : String(f[C[col]] || '').trim(); };
+  var grupos = {}, orden = [], total = 0;
+  cat.filas.forEach(function(f){
+    var mod = v(f,'Modelo'); if (!mod) return;
+    if (marca && marcaDe(mod) !== marca) return;
+    var cab = mod + ' ' + v(f,'Capacidad');
+    if (!grupos[cab]) { grupos[cab] = { marca: marcaDe(mod), lineas: {}, orden: [] }; orden.push(cab); }
+    var g = grupos[cab];
+    var k = [v(f,'Color'), v(f,'Categoría'), v(f,'Batería'), v(f,'Precio Venta')].join('|');
+    if (!g.lineas[k]) { g.lineas[k] = { f: f, n: 0 }; g.orden.push(k); }
+    g.lineas[k].n++; total++;
+  });
+  var marcas = ['iPhone', 'Samsung', 'Otros'];
+  orden.sort(function(a, b){ return marcas.indexOf(grupos[a].marca) - marcas.indexOf(grupos[b].marca); });
+  var d = new Date(), p2 = function(n){ return (n < 10 ? '0' : '') + n; };
+  var txt = '*TECNOSHOPSV · Disponible hoy*\n_' + DIAS_LARGO[d.getDay()] + ' ' + p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '_\n';
+  var marcaAct = '';
+  orden.forEach(function(cab){
+    var g = grupos[cab];
+    if (!marca && g.marca !== marcaAct) { marcaAct = g.marca; txt += '\n━━━ *' + marcaAct.toUpperCase() + '* ━━━\n'; }
+    txt += '\n*' + cab + '*\n';
+    g.orden.forEach(function(k){
+      var l = g.lineas[k], f = l.f, partes = [v(f,'Color'), v(f,'Categoría'), v(f,'Batería')].filter(Boolean);
+      var precio = precioCorto(v(f,'Precio Venta'));
+      txt += '• ' + partes.join(' · ') + ' — ' + (precio || 'Consultar precio') + ' (' + l.n + ')\n';
+    });
+  });
+  txt += '\n📦 ' + total + (total === 1 ? ' unidad disponible' : ' unidades disponibles') + '\n';
+  txt += '👉 Inventario en vivo: catalogo.tecnoshopsv.com\n📲 Pedidos al WhatsApp 7001-2323';
+  return { texto: txt, total: total };
+}
+$('difGenerar').addEventListener('click', function(){
+  var b = $('difGenerar'); b.disabled = true; b.textContent = 'Generando…'; $('difInfo').textContent = '';
+  fetch(API + '?fn=getCatalogo&a=' + encodeURIComponent('[]')).then(function(r){ return r.json(); }).then(function(res){
+    var cat = JSON.parse(typeof res === 'string' ? res : res.c);
+    var d = armarDifusion(cat, $('difMarca').value);
+    $('difTexto').value = d.texto; $('difTexto').hidden = false;
+    $('difCopiar').hidden = false; $('difWA').hidden = false;
+    $('difInfo').textContent = d.total + ' unidades · ' + d.texto.length + ' caracteres. Puedes editar el texto antes de copiarlo.';
+  }).catch(function(){ $('difInfo').textContent = 'No se pudo leer el inventario. Revisa tu conexión e intenta de nuevo.'; })
+    .then(function(){ b.disabled = false; b.textContent = 'Generar de nuevo'; });
+});
+$('difCopiar').addEventListener('click', function(){
+  var t = $('difTexto'), ok = function(){ $('difInfo').textContent = '✓ Mensaje copiado. Pégalo en WhatsApp.'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t.value).then(ok, function(){ t.select(); document.execCommand('copy'); ok(); });
+  else { t.select(); document.execCommand('copy'); ok(); }
+});
+$('difWA').addEventListener('click', function(){
+  window.open('https://wa.me/?text=' + encodeURIComponent($('difTexto').value), '_blank');
+});
 
 // Si la contraseña quedó recordada en este dispositivo, entrar directo
 var recordada = null; try { recordada = localStorage.getItem(GUARDADA); } catch (e) {}
