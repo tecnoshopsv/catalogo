@@ -81,6 +81,7 @@
   .alerta h2.t{color:#8A1C1C}
   .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
   .dias{font-weight:800;color:#8A1C1C}
+  td.imei{font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
   .destacado h2.t{color:#5A4300}
 </style>
 </head>
@@ -225,8 +226,8 @@ function pintar(r){
   if (inv && !inv.error && inv.totalIncompletos) {
     html += '<section class="alerta"><h2 class="t">⚠️ Equipos disponibles con datos incompletos (' + inv.totalIncompletos + ')</h2>' +
       '<p class="nota">Complétalos en el Inventario Interno para que salgan bien en el catálogo, la lista de precios y las cotizaciones.</p>' +
-      '<table><tr><th>SKU</th><th>Equipo</th><th>Le falta</th></tr>' + inv.incompletos.map(function(x){
-        return '<tr><td class="det">' + esc(x.sku || '—') + '</td><td>' + esc(x.desc) + '</td><td>' + x.falta.map(function(f){ return '<span class="falta">' + esc(f) + '</span>'; }).join('') + '</td></tr>';
+      '<table><tr><th>SKU</th><th>IMEI</th><th>Equipo</th><th>Le falta</th></tr>' + inv.incompletos.map(function(x){
+        return '<tr><td class="det">' + esc(x.sku || '—') + '</td><td class="det imei">' + esc(x.imei || '—') + '</td><td>' + esc(x.desc) + '</td><td>' + x.falta.map(function(f){ return '<span class="falta">' + esc(f) + '</span>'; }).join('') + '</td></tr>';
       }).join('') + '</table>' + (inv.totalIncompletos > inv.incompletos.length ? '<div class="det" style="margin-top:6px">Y ' + (inv.totalIncompletos - inv.incompletos.length) + ' más.</div>' : '') + '</section>';
   }
 
