@@ -77,6 +77,10 @@
   .resumen30{font-size:13px;margin-top:10px;padding-top:10px;border-top:1px solid var(--linea)}
   .resumen30 b{color:var(--morado)}
   .destacado{border-color:#F3D27A;background:#FFFCF2}
+  .alerta{border-color:#F5C2C2;background:#FFF6F6}
+  .alerta h2.t{color:#8A1C1C}
+  .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
+  .dias{font-weight:800;color:#8A1C1C}
   .destacado h2.t{color:#5A4300}
 </style>
 </head>
@@ -215,6 +219,17 @@ function pintar(r){
     card('Pedidos últimos 30 días', r.total30.pedidos, r.total30.unidades + ' equipos · ' + dinero(r.total30.monto)) +
   '</div>';
 
+  // Revisión del inventario: datos incompletos y equipos estancados
+  var inv = r.inventario;
+  if (inv && inv.error) html += '<div class="err">No se pudo revisar el inventario: ' + esc(inv.error) + '</div>';
+  if (inv && !inv.error && inv.totalIncompletos) {
+    html += '<section class="alerta"><h2 class="t">⚠️ Equipos disponibles con datos incompletos (' + inv.totalIncompletos + ')</h2>' +
+      '<p class="nota">Complétalos en el Inventario Interno para que salgan bien en el catálogo, la lista de precios y las cotizaciones.</p>' +
+      '<table><tr><th>SKU</th><th>Equipo</th><th>Le falta</th></tr>' + inv.incompletos.map(function(x){
+        return '<tr><td class="det">' + esc(x.sku || '—') + '</td><td>' + esc(x.desc) + '</td><td>' + x.falta.map(function(f){ return '<span class="falta">' + esc(f) + '</span>'; }).join('') + '</td></tr>';
+      }).join('') + '</table>' + (inv.totalIncompletos > inv.incompletos.length ? '<div class="det" style="margin-top:6px">Y ' + (inv.totalIncompletos - inv.incompletos.length) + ' más.</div>' : '') + '</section>';
+  }
+
   // 1. Búsquedas sin resultado
   var sr = r.sinResultado || [];
   html += '<section class="destacado"><h2 class="t">Lo que buscaron y no encontraron (30 días)</h2><p class="nota">Equipos que tus clientes buscaron cuando no tenías disponibles. Úsalo para decidir qué comprar.</p>';
@@ -223,6 +238,19 @@ function pintar(r){
     return '<tr><td>' + esc(b.texto) + '</td><td class="num">' + b.personas + '</td><td class="num">' + b.veces + '</td><td class="num det">' + esc(b.ultima) + '</td></tr>';
   }).join('') + '</table>';
   html += '</section>';
+
+  // Equipos estancados (30+ días en stock)
+  if (inv && !inv.error) {
+    var es = inv.estancados || [];
+    html += '<section><h2 class="t">🐢 Equipos con 30 días o más sin venderse</h2><p class="nota">Equipos disponibles según su «Fecha Ingreso». Si les bajas el precio, en el catálogo salen con la etiqueta «Bajó de precio».' +
+      (inv.sinFecha ? ' ' + plural(inv.sinFecha, 'equipo no tiene', 'equipos no tienen') + ' fecha de ingreso y no se cuentan.' : '') + '</p>';
+    if (!es.length) html += '<div class="vacio">¡Bien! Ningún equipo disponible lleva 30 días o más en stock.</div>';
+    else html += '<div class="resumen30" style="margin:0 0 8px;padding:0;border:0"><b>' + plural(inv.unidadesEstancadas, 'unidad', 'unidades') + '</b> de ' + inv.disponibles + ' disponibles llevan 30 días o más.</div>' +
+      '<table><tr><th>Equipo</th><th class="num">Días</th><th class="num">Unid.</th><th class="num">Precio</th></tr>' + es.map(function(g){
+        return '<tr><td>' + esc(g.desc) + (g.ubic.length ? '<div class="det">' + esc(g.ubic.join(', ')) + '</div>' : '') + '</td><td class="num dias">' + g.dias + '</td><td class="num">' + g.n + '</td><td class="num">' + esc(g.precio || '—') + '</td></tr>';
+      }).join('') + '</table>';
+    html += '</section>';
+  }
 
   // 2. Modelos más vistos
   var vs = r.vistos || [];
