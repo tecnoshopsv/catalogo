@@ -266,6 +266,18 @@ function pintar(r){
         g.ultimas.map(function(v){ return '<tr><td class="det">' + esc(v.fecha) + '</td><td>' + esc(v.cliente) + ' <span class="det">· ' + esc(v.tipo) + '</span><div class="det">' + esc(v.equipo) + (v.sku ? ' · ' + esc(v.sku) : '') + (v.imei ? ' · IMEI ' + esc(v.imei) : '') + '</div></td><td class="num">' + d0(v.precio) + '</td><td class="num">' + (v.costo == null ? '—' : d0(v.costo)) + '</td><td class="num">' + gan(v.ganancia) + '</td></tr>'; }).join('') + '</table></div>';
     }
     html += '</section>';
+    // Mejores clientes de mayoreo
+    var mc = g.mejoresMayoreo || [];
+    html += '<section class="gan"><h2 class="t">🏆 Mejores clientes de mayoreo</h2><p class="nota">Clientes de tus ventas de Mayoreo registradas con el botón, ordenados por lo que te han comprado. «Compras» cuenta los días distintos en que compraron. En rojo, los que llevan más de 30 días sin comprar: buen momento para escribirles.</p>';
+    if (!mc.length) html += '<div class="vacio">Todavía no hay ventas de Mayoreo registradas con el botón.</div>';
+    else html += '<div class="tscroll"><table><tr><th>Cliente</th><th class="num">Total</th><th class="num">Ganancia</th><th class="num">Última</th></tr>' + mc.map(function(c, i){
+        var inactivo = c.diasSinComprar > 30;
+        var det = c.equipos + (c.equipos === 1 ? ' equipo' : ' equipos') + ' · ' + c.compras + (c.compras === 1 ? ' compra' : ' compras') + (c.margen != null ? ' · margen ' + pct(c.margen) : '');
+        return '<tr><td><b>' + (i + 1) + '. ' + esc(c.cliente) + '</b><div class="det">' + esc(det) + '</div></td>' +
+          '<td class="num">' + d0(c.ventas) + '</td><td class="num">' + gan(c.equipos > c.sinCosto ? c.ganancia : null) + '</td>' +
+          '<td class="num' + (inactivo ? ' dias' : ' det') + '">' + esc(c.ultima) + '<div class="det">' + (c.diasSinComprar === 0 ? 'hoy' : 'hace ' + c.diasSinComprar + (c.diasSinComprar === 1 ? ' día' : ' días')) + '</div></td></tr>';
+      }).join('') + '</table></div>';
+    html += '</section>';
   }
 
   // Revisión del inventario: datos incompletos y equipos estancados
