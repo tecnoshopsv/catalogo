@@ -81,6 +81,14 @@
   .alerta h2.t{color:#8A1C1C}
   .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
   .dias{font-weight:800;color:#8A1C1C}
+  .gan h2.t{color:#0E6B4E}
+  .gan{border-color:#BDEFD0}
+  .pos{color:#0E6B4E;font-weight:700}.neg{color:#C62828;font-weight:700}
+  .tipos2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .tipos2 .card .v{font-size:20px}
+  h3.sub{font-size:13px;margin:16px 0 6px;color:var(--suave);text-transform:uppercase;letter-spacing:.3px}
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .gan table td,.gan table th{padding:7px 5px}
   td.imei{font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
   .destacado h2.t{color:#5A4300}
 </style>
@@ -219,6 +227,39 @@ function pintar(r){
     card('Conversión (30 días)', porcentaje(c.compradores, c.visitantes), c.compradores + ' de ' + plural(c.visitantes, 'persona', 'personas') + (c.compradores === 1 ? ' envió pedido' : ' enviaron pedido')) +
     card('Pedidos últimos 30 días', r.total30.pedidos, r.total30.unidades + ' equipos · ' + dinero(r.total30.monto)) +
   '</div>';
+
+  // Ventas y ganancias (ventas registradas con "Marcar como Vendido")
+  var g = r.ganancias;
+  if (g && g.error) html += '<div class="err">No se pudieron calcular las ganancias: ' + esc(g.error) + '</div>';
+  if (g && !g.error) {
+    var MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    var nomMes = function(m){ var p = m.split('-'); return MES[Number(p[1]) - 1] + ' ' + p[0]; };
+    var pct = function(x){ return x == null ? '—' : Math.round(x * 1000) / 10 + '%'; };
+    var d0 = function(n){ n = Number(n || 0); return (n < 0 ? '-' : '') + '$' + Math.abs(Math.round(n)).toLocaleString('en-US'); };
+    var gan = function(x){ return x == null ? '<span class="det">sin costo</span>' : '<span class="' + (x < 0 ? 'neg' : 'pos') + '">' + d0(x) + '</span>'; };
+    var gm = g.esteMes, gt = g.total;
+    html += '<section class="gan"><h2 class="t">💰 Ventas y ganancias</h2><p class="nota">Ventas registradas con el botón «Marcar como Vendido». Ganancia = precio de venta − Costo Total del Inventario Interno. Las ventas anuladas no cuentan.</p>';
+    if (!gt.unidades) html += '<div class="vacio">Todavía no hay ventas registradas con el botón «Marcar como Vendido».</div>';
+    else {
+      html += '<div class="cards">' +
+        card('Vendidos este mes', gm.unidades, 'equipos en ' + nomMes(g.mesActual)) +
+        card('Ventas este mes', dinero(gm.ventas), 'costo ' + dinero(gm.costo)) +
+        card('Ganancia este mes', dinero(gm.ganancia), 'margen ' + pct(gm.margen)) +
+        card('Ganancia total', dinero(gt.ganancia), gt.unidades + ' equipos · margen ' + pct(gt.margen)) +
+      '</div>';
+      html += '<div class="tipos2">' + g.porTipo.map(function(x){
+        return card(x.tipo, dinero(x.ganancia), x.unidades + ' equipos · ventas ' + d0(x.ventas) + ' · margen ' + pct(x.margen));
+      }).join('') + '</div>';
+      var faltan = gt.sinCosto ? '<div class="det" style="margin-top:6px">' + plural(gt.sinCosto, 'venta no tiene', 'ventas no tienen') + ' «Costo Total» en el Inventario Interno y no suman a la ganancia.</div>' : '';
+      html += '<h3 class="sub">Por mes</h3><div class="tscroll"><table><tr><th>Mes</th><th class="num">Equipos</th><th class="num">Ventas</th><th class="num">Costo</th><th class="num">Ganancia</th><th class="num">Margen</th></tr>' +
+        g.porMes.map(function(x){ return '<tr><td>' + esc(nomMes(x.mes)) + '</td><td class="num">' + x.unidades + '</td><td class="num">' + d0(x.ventas) + '</td><td class="num">' + d0(x.costo) + '</td><td class="num">' + gan(x.ganancia) + '</td><td class="num">' + pct(x.margen) + '</td></tr>'; }).join('') + '</table></div>' + faltan;
+      html += '<h3 class="sub">Ganancia por modelo</h3><div class="tscroll"><table><tr><th>Modelo</th><th class="num">Equipos</th><th class="num">Ventas</th><th class="num">Ganancia</th><th class="num">Por equipo</th></tr>' +
+        g.porModelo.map(function(x){ var c = x.unidades - x.sinCosto; return '<tr><td>' + esc(x.modelo) + '</td><td class="num">' + x.unidades + '</td><td class="num">' + d0(x.ventas) + '</td><td class="num">' + gan(c ? x.ganancia : null) + '</td><td class="num">' + (c ? gan(x.ganancia / c) : '—') + '</td></tr>'; }).join('') + '</table></div>';
+      html += '<h3 class="sub">Últimas ventas</h3><div class="tscroll"><table><tr><th>Fecha</th><th>Cliente</th><th class="num">Precio</th><th class="num">Costo</th><th class="num">Ganancia</th></tr>' +
+        g.ultimas.map(function(v){ return '<tr><td class="det">' + esc(v.fecha) + '</td><td>' + esc(v.cliente) + ' <span class="det">· ' + esc(v.tipo) + '</span><div class="det">' + esc(v.equipo) + (v.sku ? ' · ' + esc(v.sku) : '') + '</div></td><td class="num">' + d0(v.precio) + '</td><td class="num">' + (v.costo == null ? '—' : d0(v.costo)) + '</td><td class="num">' + gan(v.ganancia) + '</td></tr>'; }).join('') + '</table></div>';
+    }
+    html += '</section>';
+  }
 
   // Revisión del inventario: datos incompletos y equipos estancados
   var inv = r.inventario;
