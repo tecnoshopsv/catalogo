@@ -82,6 +82,11 @@
   .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
   .dias{font-weight:800;color:#8A1C1C}
   tr.reb td{border-top:0;padding-top:0}
+  .rot{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:1px 6px;margin-left:4px;vertical-align:1px}
+  .rot.rap{background:#E3F4EC;color:#0E6B4E}.rot.nor{background:#EEE;color:#555}.rot.len{background:#FDECEC;color:#8A1C1C}.rot.rep{background:#D84315;color:#fff}
+  .val h2.t{color:#1B4F94}.val{border-color:#CFE0F7}
+  .val .cards .card .v{font-size:20px}
+  .val table td,.val table th{padding:7px 4px;font-size:13px}
   .rebaja{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#FFF6F2;border:1px solid #F5D3C4;border-radius:10px;padding:7px 9px;font-size:12px;color:#7A2E12}
   .rebaja input{width:86px;padding:6px 8px;border:1px solid #E8B9A5;border-radius:8px;font-size:14px;text-align:right}
   .rebaja button,.ofe-quitar,.ofe-link{border:0;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;cursor:pointer;background:#D84315;color:#fff}
@@ -355,6 +360,45 @@ function pintar(r){
           '<td class="num' + (inactivo ? ' dias' : ' det') + '">' + esc(c.ultima) + '<div class="det">' + (c.diasSinComprar === 0 ? 'hoy' : 'hace ' + c.diasSinComprar + (c.diasSinComprar === 1 ? ' día' : ' días')) + '</div></td></tr>' +
           '<tr class="hist" data-hist="' + i + '" hidden><td colspan="4">' + resumen + (h.length ? tabla : '<div class="det">Sin detalle.</div>') + '</td></tr>';
       }).join('') + '</table></div>';
+    html += '</section>';
+  }
+
+  // Valor del inventario y rotación por modelo
+  var rt = r.rotacion;
+  if (rt && rt.error) html += '<div class="err">No se pudo calcular el valor del inventario: ' + esc(rt.error) + '</div>';
+  if (rt && !rt.error) {
+    var m0 = function(n){ n = Number(n || 0); return (n < 0 ? '-' : '') + '$' + Math.abs(Math.round(n)).toLocaleString('en-US'); };
+    var pc = function(g, c){ return c > 0 ? Math.round(g / c * 1000) / 10 + '%' : '—'; };
+    var mn = rt.mano;
+    var tabla = function(titulo, filas){
+      return '<h3 class="sub">' + titulo + '</h3><div class="tscroll"><table><tr><th></th><th class="num">Cant.</th><th class="num">Costo</th><th class="num">Valor</th><th class="num">Gana</th></tr>' +
+        filas.map(function(x){ return '<tr><td>' + esc(x.nombre) + (x.sinCosto ? '<div class="det">' + x.sinCosto + ' sin costo</div>' : '') + '</td><td class="num">' + x.n + '</td><td class="num">' + m0(x.costo) + '</td><td class="num">' + m0(x.valor) + '</td><td class="num"><span class="pos">' + m0(x.ganancia) + '</span></td></tr>'; }).join('') +
+        '</table></div>';
+    };
+    html += '<section class="val"><h2 class="t">💼 Valor del inventario</h2><p class="nota">«En tus manos» = Disponible + Reservado + Taller (sin contar lo que viene En tránsito). Invertido = «Costo Total»; Valor = «Precio Venta Mayorista»; Ganancia esperada = Valor − Invertido.</p>' +
+      '<div class="cards">' +
+        card('Equipos en tus manos', mn.n, mn.sinCosto ? mn.sinCosto + ' sin costo registrado' : 'todos con costo') +
+        card('Invertido', m0(mn.costo), 'lo que te costaron') +
+        card('Valor a precio mayoreo', m0(mn.valor), 'si vendes todo a precio de lista') +
+        card('Ganancia esperada', m0(mn.ganancia), 'margen ' + pc(mn.ganancia, mn.costo) + ' sobre costo') +
+      '</div>' + tabla('Por estado', rt.porEstado) + tabla('Por marca', rt.porMarca) + tabla('Por ubicación', rt.porUbic) + '</section>';
+
+    var ms = rt.modelos || [];
+    html += '<section class="val"><h2 class="t">📈 Qué conviene comprar</h2><p class="nota">Cuántos días tarda cada modelo en venderse (de su «Fecha Ingreso» a la fecha de venta) y cuánto deja por equipo. La fecha de venta sale de las ventas con el botón y, para ventas anteriores, de la hoja Pedidos. ' +
+      '<b>Rápido</b> = 15 días o menos · <b>Lento</b> = más de 45 días · <b>🔥 Reponer</b> = se vende rápido, se vendió 2 o más veces en 90 días y te queda poco stock.</p>';
+    if (!ms.length) html += '<div class="vacio">Todavía no hay suficientes ventas con fecha para calcular la rotación.</div>';
+    else html += '<div class="tscroll"><table><tr><th>Modelo</th><th class="num">Vendidos</th><th class="num">Días</th><th class="num">Gana</th><th class="num">Stock</th></tr>' + ms.map(function(x){
+        var et = '';
+        if (x.dias != null) {
+          if (x.dias <= 20 && x.vend90 >= 2 && (x.alcanza == null || x.alcanza <= 14) ) et = '<span class="rot rep">🔥 Reponer</span>';
+          else et = x.dias <= 15 ? '<span class="rot rap">Rápido</span>' : x.dias > 45 ? '<span class="rot len">Lento</span>' : '<span class="rot nor">Normal</span>';
+        } else if (!x.vendidos && x.edad != null && x.edad > 45) et = '<span class="rot len">Sin ventas</span>';
+        return '<tr><td>' + esc(x.modelo) + et + '</td>' +
+          '<td class="num">' + x.vendidos + '<div class="det">' + x.vend90 + ' en 90 días</div></td>' +
+          '<td class="num' + (x.dias != null && x.dias > 45 ? ' dias' : '') + '">' + (x.dias == null ? '—' : x.dias) + '</td>' +
+          '<td class="num">' + (x.ganancia == null ? '—' : '<span class="' + (x.ganancia < 0 ? 'neg' : 'pos') + '">' + m0(x.ganancia) + '</span>') + '</td>' +
+          '<td class="num">' + x.stock + (x.stock && x.alcanza != null ? '<div class="det">≈' + x.alcanza + ' días</div>' : x.stock && x.edad != null ? '<div class="det">' + x.edad + ' días prom.</div>' : '') + '</td></tr>';
+      }).join('') + '</table></div><div class="det" style="margin-top:6px">Días = promedio que tardó en venderse. Gana = ganancia promedio por equipo. Stock ≈ días = para cuántos días te alcanza al ritmo de los últimos 90 días.</div>';
     html += '</section>';
   }
 
