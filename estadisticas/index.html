@@ -404,13 +404,13 @@ function pintar(r){
       '<button type="button" class="ofe-link" data-ofelink="1">🔗 Copiar enlace de las ofertas para tus estados</button></section>';
   }
 
-  // Equipos estancados (30+ días en stock)
+  // Equipos estancados (90+ días en stock)
   if (inv && !inv.error) {
-    var es = inv.estancados || [];
-    html += '<section><h2 class="t">🐢 Equipos con 30 días o más sin venderse</h2><p class="nota">Equipos disponibles según su «Fecha Ingreso». La rebaja sugerida es su costo + $' + (inv.margenMin || 10) + ' (redondeado a $5). Puedes cambiarla antes de aplicar: baja el precio de mayoreo en el Inventario Interno y el equipo sale como 🔥 Oferta en el catálogo por ' + (inv.ofertaDias || 7) + ' días.' +
+    var es = inv.estancados || [], de = inv.diasEstancado || 90;
+    html += '<section><h2 class="t">🐢 Equipos con ' + de + ' días o más sin venderse</h2><p class="nota">Equipos disponibles según su «Fecha Ingreso». La rebaja sugerida es su costo + $' + (inv.margenMin || 20) + ' (redondeado a $5). Puedes cambiarla antes de aplicar: baja el precio de mayoreo en el Inventario Interno y el equipo sale como 🔥 Oferta en el catálogo por ' + (inv.ofertaDias || 7) + ' días.' +
       (inv.sinFecha ? ' ' + plural(inv.sinFecha, 'equipo no tiene', 'equipos no tienen') + ' fecha de ingreso y no se cuentan.' : '') + '</p>';
-    if (!es.length) html += '<div class="vacio">¡Bien! Ningún equipo disponible lleva 30 días o más en stock.</div>';
-    else html += '<div class="resumen30" style="margin:0 0 8px;padding:0;border:0"><b>' + plural(inv.unidadesEstancadas, 'unidad', 'unidades') + '</b> de ' + inv.disponibles + ' disponibles llevan 30 días o más.</div>' +
+    if (!es.length) html += '<div class="vacio">¡Bien! Ningún equipo disponible lleva ' + de + ' días o más en stock.</div>';
+    else html += '<div class="resumen30" style="margin:0 0 8px;padding:0;border:0"><b>' + plural(inv.unidadesEstancadas, 'unidad', 'unidades') + '</b> de ' + inv.disponibles + ' disponibles llevan ' + de + ' días o más.</div>' +
       '<table><tr><th>Equipo</th><th class="num">Días</th><th class="num">Unid.</th><th class="num">Precio</th></tr>' + es.map(function(g){
         var reb;
         if (g.oferta) reb = '<div class="rebaja gris">🔥 Ya está en oferta</div>';
