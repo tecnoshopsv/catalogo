@@ -281,6 +281,19 @@ function pintar(r){
   }).join('') + '</table>';
   html += '</section>';
 
+  // Equipos reservados (para liberar los que nadie vino a recoger)
+  if (inv && !inv.error && inv.reservados && inv.reservados.length) {
+    var rs = inv.reservados, viejos = rs.filter(function(x){ return x.dias != null && x.dias >= 3; }).length;
+    html += '<section class="' + (viejos ? 'alerta' : '') + '"><h2 class="t">📌 Equipos reservados (' + rs.length + ')</h2><p class="nota">Cuántos días lleva cada equipo en «Reservado». Si el cliente no llegó, libéralo desde el candadito 🔒 con «Volver a Disponible».' +
+      (viejos ? ' <b>' + plural(viejos, 'lleva', 'llevan') + ' 3 días o más.</b>' : '') + '</p>' +
+      '<div class="tscroll"><table><tr><th>Equipo</th><th class="num">Días</th><th class="num">Desde</th></tr>' + rs.map(function(x){
+        return '<tr><td>' + esc(x.desc) + '<div class="det">' + esc([x.sku, x.imei ? 'IMEI …' + String(x.imei).slice(-4) : '', x.ubic].filter(Boolean).join(' · ')) + '</div></td>' +
+          '<td class="num' + (x.dias != null && x.dias >= 3 ? ' dias' : '') + '">' + (x.dias == null ? '—' : x.dias) + '</td><td class="num det">' + (x.desde ? esc(x.desde) : 'sin fecha') + '</td></tr>';
+      }).join('') + '</table></div>' +
+      (rs.some(function(x){ return x.dias == null; }) ? '<div class="det" style="margin-top:6px">«Sin fecha»: se reservaron antes de activar este registro. Desde ahora, cada reserva (desde el catálogo o cambiando el Estado en la hoja) guarda su fecha en la columna «Fecha Reserva».</div>' : '') +
+      '</section>';
+  }
+
   // Equipos estancados (30+ días en stock)
   if (inv && !inv.error) {
     var es = inv.estancados || [];
