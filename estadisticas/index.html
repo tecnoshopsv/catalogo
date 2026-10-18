@@ -81,6 +81,14 @@
   .alerta h2.t{color:#8A1C1C}
   .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
   .dias{font-weight:800;color:#8A1C1C}
+  tr.cli{cursor:pointer}
+  tr.cli:hover td{background:#F7F3FB}
+  tr.cli .ver{font-size:12px;color:var(--morado);font-weight:700;margin-top:3px}
+  tr.cli.abierto td{background:#F2EBF9}
+  tr.hist > td{background:#FBF9FD;padding:10px 8px 14px}
+  .hres{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin-bottom:8px}
+  table.htab{background:#fff;border-radius:8px}
+  table.htab td,table.htab th{padding:6px 5px;font-size:13px}
   .gan h2.t{color:#0E6B4E}
   .gan{border-color:#BDEFD0}
   .pos{color:#0E6B4E;font-weight:700}.neg{color:#C62828;font-weight:700}
@@ -199,6 +207,17 @@ function cargar(){
     if (recordado()) { try { localStorage.setItem(ULT, JSON.stringify(r)); } catch (e) {} }
   }).catch(function(){ $('gen').textContent = 'Sin conexión · se reintentará en un minuto'; });
 }
+// Mejores clientes: tocar un cliente abre / cierra su historial de compras
+$('app').addEventListener('click', function(ev){
+  var fila = ev.target.closest && ev.target.closest('tr.cli');
+  if (!fila) return;
+  var i = fila.getAttribute('data-cli'), hist = fila.parentNode.querySelector('tr[data-hist="' + i + '"]');
+  if (!hist) return;
+  var abrir = hist.hidden;
+  hist.hidden = !abrir;
+  fila.classList.toggle('abierto', abrir);
+  var v = fila.querySelector('.ver'); if (v) v.textContent = abrir ? '▾ Ocultar compras' : '▸ Ver compras';
+});
 $('salir').addEventListener('click', function(){ try { localStorage.removeItem(GUARDADA); localStorage.removeItem(ULT); } catch (e) {} mostrarLogin(); });
 
 function barras(datos, etiqueta, valor, extra){
@@ -273,9 +292,18 @@ function pintar(r){
     else html += '<div class="tscroll"><table><tr><th>Cliente</th><th class="num">Total</th><th class="num">Ganancia</th><th class="num">Última</th></tr>' + mc.map(function(c, i){
         var inactivo = c.diasSinComprar > 30;
         var det = c.equipos + (c.equipos === 1 ? ' equipo' : ' equipos') + ' · ' + c.compras + (c.compras === 1 ? ' compra' : ' compras') + (c.margen != null ? ' · margen ' + pct(c.margen) : '');
-        return '<tr><td><b>' + (i + 1) + '. ' + esc(c.cliente) + '</b><div class="det">' + esc(det) + '</div></td>' +
+        var h = c.historial || [];
+        var resumen = '<div class="hres">' +
+          (c.favorito ? '<span>Lo que más compra: <b>' + esc(c.favorito) + '</b> (' + c.favorito_n + ')</span>' : '') +
+          '<span>Promedio por equipo: <b>' + d0(c.promedio) + '</b></span></div>';
+        var tabla = '<table class="htab"><tr><th>Fecha</th><th>Equipo</th><th class="num">Precio</th><th class="num">Ganancia</th></tr>' + h.map(function(v){
+          return '<tr><td class="det">' + esc(v.f) + '</td><td>' + esc(v.e) + '<div class="det">' + esc([v.s, v.i ? 'IMEI ' + v.i : ''].filter(Boolean).join(' · ')) + '</div></td>' +
+            '<td class="num">' + d0(v.p) + '</td><td class="num">' + gan(v.g) + '</td></tr>';
+        }).join('') + '</table>' + (c.equipos > h.length ? '<div class="det" style="margin-top:6px">Se muestran las ' + h.length + ' compras más recientes.</div>' : '');
+        return '<tr class="cli" data-cli="' + i + '"><td><b>' + (i + 1) + '. ' + esc(c.cliente) + '</b><div class="det">' + esc(det) + '</div><div class="ver">▸ Ver compras</div></td>' +
           '<td class="num">' + d0(c.ventas) + '</td><td class="num">' + gan(c.equipos > c.sinCosto ? c.ganancia : null) + '</td>' +
-          '<td class="num' + (inactivo ? ' dias' : ' det') + '">' + esc(c.ultima) + '<div class="det">' + (c.diasSinComprar === 0 ? 'hoy' : 'hace ' + c.diasSinComprar + (c.diasSinComprar === 1 ? ' día' : ' días')) + '</div></td></tr>';
+          '<td class="num' + (inactivo ? ' dias' : ' det') + '">' + esc(c.ultima) + '<div class="det">' + (c.diasSinComprar === 0 ? 'hoy' : 'hace ' + c.diasSinComprar + (c.diasSinComprar === 1 ? ' día' : ' días')) + '</div></td></tr>' +
+          '<tr class="hist" data-hist="' + i + '" hidden><td colspan="4">' + resumen + (h.length ? tabla : '<div class="det">Sin detalle.</div>') + '</td></tr>';
       }).join('') + '</table></div>';
     html += '</section>';
   }
