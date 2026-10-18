@@ -174,13 +174,19 @@ function entrar(ev){
   $('entrar').disabled = true; $('entrar').textContent = 'Entrando…'; $('msg').textContent = '';
   pedir(clave).then(function(r){
     if (r && r.error) { $('entrar').disabled = false; $('entrar').textContent = 'Entrar'; $('msg').textContent = textoError(r.error); return; }
-    try { if (recordar) localStorage.setItem(GUARDADA, clave); else localStorage.removeItem(GUARDADA); } catch (e) {}
+    try { if (recordar) { localStorage.setItem(GUARDADA, clave); localStorage.setItem(ULT, JSON.stringify(r)); } else { localStorage.removeItem(GUARDADA); localStorage.removeItem(ULT); } } catch (e) {}
     iniciar(clave, r);
   }).catch(function(){ $('entrar').disabled = false; $('entrar').textContent = 'Entrar'; $('msg').textContent = textoError(); });
 }
+var ULT = 'tsv_stats_ult';   // últimos datos, solo si la contraseña está recordada en este dispositivo
+function recordado(){ try { return !!localStorage.getItem(GUARDADA); } catch (e) { return false; } }
 function iniciar(clave, primeros){
   CLAVE = clave; $('salir').hidden = false; $('herr').hidden = false;
-  if (primeros) pintar(primeros); else $('app').innerHTML = '<div class="cargando">Cargando estadísticas…</div>';
+  var previo = null;
+  if (!primeros && recordado()) { try { previo = JSON.parse(localStorage.getItem(ULT) || 'null'); } catch (e) {} }
+  if (primeros) pintar(primeros);
+  else if (previo) { try { pintar(previo); $('gen').textContent = 'Actualizando…'; } catch (e) { $('app').innerHTML = '<div class="cargando">Cargando estadísticas…</div>'; } }
+  else $('app').innerHTML = '<div class="cargando">Cargando estadísticas…</div>';
   if (!primeros) cargar();
   clearInterval(timer); timer = setInterval(cargar, 60000);
 }
@@ -190,9 +196,10 @@ function cargar(){
     if (r && r.error === 'No autorizado') { try { localStorage.removeItem(GUARDADA); } catch (e) {} mostrarLogin('La contraseña cambió. Escríbela de nuevo.'); return; }
     if (r && r.error) { $('gen').textContent = textoError(r.error); return; }
     pintar(r);
+    if (recordado()) { try { localStorage.setItem(ULT, JSON.stringify(r)); } catch (e) {} }
   }).catch(function(){ $('gen').textContent = 'Sin conexión · se reintentará en un minuto'; });
 }
-$('salir').addEventListener('click', function(){ try { localStorage.removeItem(GUARDADA); } catch (e) {} mostrarLogin(); });
+$('salir').addEventListener('click', function(){ try { localStorage.removeItem(GUARDADA); localStorage.removeItem(ULT); } catch (e) {} mostrarLogin(); });
 
 function barras(datos, etiqueta, valor, extra){
   var max = Math.max.apply(null, datos.map(valor).concat([1]));
