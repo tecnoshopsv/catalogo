@@ -81,6 +81,16 @@
   .alerta h2.t{color:#8A1C1C}
   .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
   .dias{font-weight:800;color:#8A1C1C}
+  tr.reb td{border-top:0;padding-top:0}
+  .rebaja{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#FFF6F2;border:1px solid #F5D3C4;border-radius:10px;padding:7px 9px;font-size:12px;color:#7A2E12}
+  .rebaja input{width:86px;padding:6px 8px;border:1px solid #E8B9A5;border-radius:8px;font-size:14px;text-align:right}
+  .rebaja button,.ofe-quitar,.ofe-link{border:0;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;cursor:pointer;background:#D84315;color:#fff}
+  .ofe-quitar{background:#fff;color:#8A1C1C;border:1px solid #E7B4B4;padding:5px 9px;font-size:12px}
+  .ofe-link{background:#FFF1EC;color:#B3261E;border:1px solid #F5B8A3;margin-top:8px}
+  .rebaja .ok{color:#0E6B4E;font-weight:700}.rebaja .mal{color:#C62828;font-weight:700}
+  .rebaja.gris{background:#F6F6F6;border-color:#E6E6E6;color:var(--suave)}
+  .ofe h2.t{color:#B3261E}
+  s.antes{color:var(--suave);font-weight:400;margin-right:4px}
   tr.cli{cursor:pointer}
   tr.cli:hover td{background:#F7F3FB}
   tr.cli .ver{font-size:12px;color:var(--morado);font-weight:700;margin-top:3px}
@@ -203,10 +213,50 @@ function cargar(){
   pedir(CLAVE).then(function(r){
     if (r && r.error === 'No autorizado') { try { localStorage.removeItem(GUARDADA); } catch (e) {} mostrarLogin('La contraseña cambió. Escríbela de nuevo.'); return; }
     if (r && r.error) { $('gen').textContent = textoError(r.error); return; }
-    pintar(r);
+    if (!editando()) pintar(r); else $('gen').textContent = 'Datos nuevos listos · se mostrarán al terminar';
     if (recordado()) { try { localStorage.setItem(ULT, JSON.stringify(r)); } catch (e) {} }
   }).catch(function(){ $('gen').textContent = 'Sin conexión · se reintentará en un minuto'; });
 }
+// Rebajas y ofertas (con la misma contraseña de estadísticas)
+var accionando = false;
+function accion(datos, ok, mal){
+  accionando = true;
+  datos.clave = CLAVE;
+  fetch(API, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(datos) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){ accionando = false; if (!r || r.error) mal(r && r.error === 'No autorizado' ? 'Contraseña incorrecta.' : String(r && r.error || 'Error')); else ok(r); },
+          function(){ accionando = false; mal('No se pudo conectar. Intenta de nuevo.'); });
+}
+$('app').addEventListener('click', function(ev){
+  var b = ev.target.closest && ev.target.closest('.reb-ok');
+  if (b) {
+    var caja = b.closest('.rebaja'), msg = caja.querySelector('.reb-msg'), precio = Number(String(caja.querySelector('.reb-p').value).replace(/[^0-9.]/g, ''));
+    if (!(precio > 0)) { msg.className = 'reb-msg mal'; msg.textContent = 'Escribe el precio'; return; }
+    if (!b.classList.contains('seguro')) { b.classList.add('seguro'); b.textContent = '¿Seguro? Toca otra vez'; return; }
+    b.disabled = true; b.textContent = 'Aplicando…';
+    accion({ fn:'rebaja', skus: caja.getAttribute('data-skus').split(','), precio: precio }, function(r){
+      caja.innerHTML = '<span class="ok">✓ Rebajado a $' + r.precio + ' (' + plural(r.equipos, 'equipo', 'equipos') + ') y en 🔥 Oferta en el catálogo.</span>';
+      setTimeout(cargar, 1500);
+    }, function(m){ b.disabled = false; b.classList.remove('seguro'); b.textContent = 'Aplicar rebaja 🔥'; msg.className = 'reb-msg mal'; msg.textContent = m; });
+    return;
+  }
+  var q = ev.target.closest && ev.target.closest('.ofe-quitar');
+  if (q) {
+    q.disabled = true; q.textContent = 'Quitando…';
+    accion({ fn:'ofertaadmin', skus: q.getAttribute('data-skus').split(','), poner: false }, function(){
+      q.closest('tr').style.opacity = .45; q.outerHTML = '<span class="det">Quitada</span>'; setTimeout(cargar, 1500);
+    }, function(m){ q.disabled = false; q.textContent = 'Quitar'; alert(m); });
+    return;
+  }
+  if (ev.target.closest && ev.target.closest('[data-ofelink]')) {
+    var url = 'https://catalogo.tecnoshopsv.com/#ofertas', el = ev.target.closest('[data-ofelink]');
+    var hecho = function(){ el.textContent = '✓ Enlace copiado: ' + url; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(hecho, function(){ prompt('Copia este enlace:', url); });
+    else prompt('Copia este enlace:', url);
+  }
+});
+// Mientras escribes un precio de rebaja, la actualización automática espera
+function editando(){ var a = document.activeElement; return accionando || (a && a.classList && a.classList.contains('reb-p')); }
 // Mejores clientes: tocar un cliente abre / cierra su historial de compras
 $('app').addEventListener('click', function(ev){
   var fila = ev.target.closest && ev.target.closest('tr.cli');
@@ -341,15 +391,34 @@ function pintar(r){
       '</section>';
   }
 
+  // Equipos en oferta
+  if (inv && !inv.error && inv.ofertas && inv.ofertas.length) {
+    var ofs = inv.ofertas, nOf = ofs.reduce(function(s, o){ return s + o.n; }, 0);
+    html += '<section class="ofe"><h2 class="t">🔥 Equipos en oferta (' + nOf + ')</h2><p class="nota">Salen primero en el catálogo con la etiqueta 🔥 Oferta. La etiqueta se quita sola a los ' + (inv.ofertaDias || 7) + ' días (el precio rebajado se queda).</p>' +
+      '<div class="tscroll"><table><tr><th>Equipo</th><th class="num">Precio</th><th class="num">Quedan</th><th></th></tr>' + ofs.map(function(o){
+        return '<tr><td>' + esc(o.desc) + '<div class="det">' + plural(o.n, 'unidad', 'unidades') + '</div></td>' +
+          '<td class="num">' + (o.antes > 0 ? '<s class="antes">$' + Math.round(o.antes) + '</s>' : '') + esc(o.precio) + '</td>' +
+          '<td class="num">' + o.quedan + (o.quedan === 1 ? ' día' : ' días') + '</td>' +
+          '<td class="num">' + (o.skus.length ? '<button type="button" class="ofe-quitar" data-skus="' + esc(o.skus.join(',')) + '">Quitar</button>' : '') + '</td></tr>';
+      }).join('') + '</table></div>' +
+      '<button type="button" class="ofe-link" data-ofelink="1">🔗 Copiar enlace de las ofertas para tus estados</button></section>';
+  }
+
   // Equipos estancados (30+ días en stock)
   if (inv && !inv.error) {
     var es = inv.estancados || [];
-    html += '<section><h2 class="t">🐢 Equipos con 30 días o más sin venderse</h2><p class="nota">Equipos disponibles según su «Fecha Ingreso». Si les bajas el precio, en el catálogo salen con la etiqueta «Bajó de precio».' +
+    html += '<section><h2 class="t">🐢 Equipos con 30 días o más sin venderse</h2><p class="nota">Equipos disponibles según su «Fecha Ingreso». La rebaja sugerida es su costo + $' + (inv.margenMin || 10) + ' (redondeado a $5). Puedes cambiarla antes de aplicar: baja el precio de mayoreo en el Inventario Interno y el equipo sale como 🔥 Oferta en el catálogo por ' + (inv.ofertaDias || 7) + ' días.' +
       (inv.sinFecha ? ' ' + plural(inv.sinFecha, 'equipo no tiene', 'equipos no tienen') + ' fecha de ingreso y no se cuentan.' : '') + '</p>';
     if (!es.length) html += '<div class="vacio">¡Bien! Ningún equipo disponible lleva 30 días o más en stock.</div>';
     else html += '<div class="resumen30" style="margin:0 0 8px;padding:0;border:0"><b>' + plural(inv.unidadesEstancadas, 'unidad', 'unidades') + '</b> de ' + inv.disponibles + ' disponibles llevan 30 días o más.</div>' +
       '<table><tr><th>Equipo</th><th class="num">Días</th><th class="num">Unid.</th><th class="num">Precio</th></tr>' + es.map(function(g){
-        return '<tr><td>' + esc(g.desc) + (g.ubic.length ? '<div class="det">' + esc(g.ubic.join(', ')) + '</div>' : '') + '</td><td class="num dias">' + g.dias + '</td><td class="num">' + g.n + '</td><td class="num">' + esc(g.precio || '—') + '</td></tr>';
+        var reb;
+        if (g.oferta) reb = '<div class="rebaja gris">🔥 Ya está en oferta</div>';
+        else if (!g.skus || !g.skus.length) reb = '<div class="rebaja gris">Sin SKU: no se puede rebajar desde aquí</div>';
+        else if (!g.sugerido) reb = '<div class="rebaja gris">' + (g.costo ? 'Su precio ya está cerca del costo ($' + Math.round(g.costo) + ')' : 'Sin «Costo Total» en el inventario para sugerir rebaja') + '</div>';
+        else reb = '<div class="rebaja" data-skus="' + esc(g.skus.join(',')) + '">Rebaja sugerida: $<input class="reb-p" inputmode="decimal" value="' + g.sugerido + '"><button type="button" class="reb-ok">Aplicar rebaja 🔥</button><span class="reb-msg det">costo $' + Math.round(g.costo) + '</span></div>';
+        return '<tr><td>' + esc(g.desc) + (g.ubic.length ? '<div class="det">' + esc(g.ubic.join(', ')) + '</div>' : '') + '</td><td class="num dias">' + g.dias + '</td><td class="num">' + g.n + '</td><td class="num">' + esc(g.precio || '—') + '</td></tr>' +
+          '<tr class="reb"><td colspan="4">' + reb + '</td></tr>';
       }).join('') + '</table>';
     html += '</section>';
   }
