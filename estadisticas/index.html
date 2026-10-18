@@ -256,7 +256,7 @@ function pintar(r){
       html += '<h3 class="sub">Ganancia por modelo</h3><div class="tscroll"><table><tr><th>Modelo</th><th class="num">Equipos</th><th class="num">Ventas</th><th class="num">Ganancia</th><th class="num">Por equipo</th></tr>' +
         g.porModelo.map(function(x){ var c = x.unidades - x.sinCosto; return '<tr><td>' + esc(x.modelo) + '</td><td class="num">' + x.unidades + '</td><td class="num">' + d0(x.ventas) + '</td><td class="num">' + gan(c ? x.ganancia : null) + '</td><td class="num">' + (c ? gan(x.ganancia / c) : '—') + '</td></tr>'; }).join('') + '</table></div>';
       html += '<h3 class="sub">Últimas ventas</h3><div class="tscroll"><table><tr><th>Fecha</th><th>Cliente</th><th class="num">Precio</th><th class="num">Costo</th><th class="num">Ganancia</th></tr>' +
-        g.ultimas.map(function(v){ return '<tr><td class="det">' + esc(v.fecha) + '</td><td>' + esc(v.cliente) + ' <span class="det">· ' + esc(v.tipo) + '</span><div class="det">' + esc(v.equipo) + (v.sku ? ' · ' + esc(v.sku) : '') + '</div></td><td class="num">' + d0(v.precio) + '</td><td class="num">' + (v.costo == null ? '—' : d0(v.costo)) + '</td><td class="num">' + gan(v.ganancia) + '</td></tr>'; }).join('') + '</table></div>';
+        g.ultimas.map(function(v){ return '<tr><td class="det">' + esc(v.fecha) + '</td><td>' + esc(v.cliente) + ' <span class="det">· ' + esc(v.tipo) + '</span><div class="det">' + esc(v.equipo) + (v.sku ? ' · ' + esc(v.sku) : '') + (v.imei ? ' · IMEI ' + esc(v.imei) : '') + '</div></td><td class="num">' + d0(v.precio) + '</td><td class="num">' + (v.costo == null ? '—' : d0(v.costo)) + '</td><td class="num">' + gan(v.ganancia) + '</td></tr>'; }).join('') + '</table></div>';
     }
     html += '</section>';
   }
@@ -287,7 +287,7 @@ function pintar(r){
     html += '<section class="' + (viejos ? 'alerta' : '') + '"><h2 class="t">📌 Equipos reservados (' + rs.length + ')</h2><p class="nota">Cuántos días lleva cada equipo en «Reservado». Si el cliente no llegó, libéralo desde el candadito 🔒 con «Volver a Disponible».' +
       (viejos ? ' <b>' + plural(viejos, 'lleva', 'llevan') + ' 3 días o más.</b>' : '') + '</p>' +
       '<div class="tscroll"><table><tr><th>Equipo</th><th class="num">Días</th><th class="num">Desde</th></tr>' + rs.map(function(x){
-        return '<tr><td>' + esc(x.desc) + '<div class="det">' + esc([x.sku, x.imei ? 'IMEI …' + String(x.imei).slice(-4) : '', x.ubic].filter(Boolean).join(' · ')) + '</div></td>' +
+        return '<tr><td>' + esc(x.desc) + '<div class="det">' + esc([x.sku, x.imei ? 'IMEI ' + x.imei : '', x.ubic].filter(Boolean).join(' · ')) + '</div></td>' +
           '<td class="num' + (x.dias != null && x.dias >= 3 ? ' dias' : '') + '">' + (x.dias == null ? '—' : x.dias) + '</td><td class="num det">' + (x.desde ? esc(x.desde) : 'sin fecha') + '</td></tr>';
       }).join('') + '</table></div>' +
       (rs.some(function(x){ return x.dias == null; }) ? '<div class="det" style="margin-top:6px">«Sin fecha»: se reservaron antes de activar este registro. Desde ahora, cada reserva (desde el catálogo o cambiando el Estado en la hoja) guarda su fecha en la columna «Fecha Reserva».</div>' : '') +
