@@ -82,6 +82,9 @@
   .falta{display:inline-block;background:#FDECEC;color:#8A1C1C;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin:1px 2px 1px 0}
   .dias{font-weight:800;color:#8A1C1C}
   tr.reb td{border-top:0;padding-top:0}
+  .bit-f{width:100%;padding:9px 11px;border:1px solid var(--linea);border-radius:10px;font-size:15px;margin:0 0 8px}
+  .bit-a{font-weight:700}
+  .bit-a.vend{color:#0E6B4E}.bit-a.res{color:#7A5200}.bit-a.anu{color:#C62828}.bit-a.ofe{color:#D84315}
   .rot{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:1px 6px;margin-left:4px;vertical-align:1px}
   .rot.rap{background:#E3F4EC;color:#0E6B4E}.rot.nor{background:#EEE;color:#555}.rot.len{background:#FDECEC;color:#8A1C1C}.rot.rep{background:#D84315;color:#fff}
   .val h2.t{color:#1B4F94}.val{border-color:#CFE0F7}
@@ -136,10 +139,11 @@
   </section>
   <section class="est-sec">
     <h2 class="t">Imagen para estados e Instagram</h2>
-    <p class="nota">Crea una imagen vertical con tu logo y lo recién llegado o rebajado, lista para subir a tus estados.</p>
+    <p class="nota">Crea una imagen vertical con tu logo y lo recién llegado, rebajado o en 🔥 oferta, lista para subir a tus estados.</p>
     <div class="dif-ctrl">
       <select id="estModo">
-        <option value="auto">Recién llegado y rebajas</option>
+        <option value="oferta">🔥 Solo ofertas</option>
+        <option value="auto">Recién llegado, rebajas y ofertas</option>
         <option value="nuevo">Solo recién llegado</option>
         <option value="baja">Solo rebajas</option>
         <option value="todo">Lo más disponible hoy</option>
@@ -261,7 +265,14 @@ $('app').addEventListener('click', function(ev){
   }
 });
 // Mientras escribes un precio de rebaja, la actualización automática espera
-function editando(){ var a = document.activeElement; return accionando || (a && a.classList && a.classList.contains('reb-p')); }
+function editando(){ var a = document.activeElement; return accionando || (a && a.classList && (a.classList.contains('reb-p') || a.id === 'bitFiltro')); }
+// Filtro de la bitácora
+var bitTexto = '';
+function filtrarBitacora(){
+  var q = bitTexto.toLowerCase().trim();
+  [].forEach.call(document.querySelectorAll('#bitTabla tr[data-b]'), function(tr){ tr.hidden = q && tr.getAttribute('data-b').indexOf(q) < 0; });
+}
+$('app').addEventListener('input', function(ev){ if (ev.target.id === 'bitFiltro') { bitTexto = ev.target.value; filtrarBitacora(); } });
 // Mejores clientes: tocar un cliente abre / cierra su historial de compras
 $('app').addEventListener('click', function(ev){
   var fila = ev.target.closest && ev.target.closest('tr.cli');
@@ -467,6 +478,21 @@ function pintar(r){
     html += '</section>';
   }
 
+  // Bitácora (últimos movimientos hechos desde el catálogo o cambiando el Estado en la hoja)
+  var bt = r.bitacora;
+  if (bt) {
+    var claseAcc = function(a){ a = String(a).toLowerCase(); return a.indexOf('vendi') === 0 ? 'vend' : a.indexOf('anul') === 0 ? 'anu' : a.indexOf('reserv') === 0 || a.indexOf('liber') === 0 ? 'res' : a.indexOf('ofert') >= 0 || a.indexOf('rebaj') === 0 ? 'ofe' : ''; };
+    html += '<section><h2 class="t">📝 Bitácora: quién hizo qué</h2><p class="nota">Últimos ' + bt.length + ' movimientos: reservas, ventas, anulaciones, ofertas y rebajas hechas desde el catálogo o Estadísticas, y cambios de Estado escritos a mano en la hoja. Todo queda en la hoja «Bitácora».</p>';
+    if (!bt.length) html += '<div class="vacio">Todavía no hay movimientos. Desde ahora cada acción queda anotada con el nombre de quien la hizo.</div>';
+    else html += '<input class="bit-f" id="bitFiltro" type="search" placeholder="Filtrar por nombre, SKU, IMEI, cliente…" autocomplete="off">' +
+      '<div class="tscroll"><table id="bitTabla"><tr><th>Cuándo</th><th>Quién · qué</th></tr>' + bt.map(function(m){
+        var busca = [m.persona, m.accion, m.sku, m.imei, m.equipo, m.detalle].join(' ').toLowerCase();
+        return '<tr data-b="' + esc(busca) + '"><td class="det" style="white-space:nowrap">' + esc(m.fecha) + '</td><td><b>' + esc(m.persona) + '</b> · <span class="bit-a ' + claseAcc(m.accion) + '">' + esc(m.accion) + '</span>' +
+          '<div>' + esc(m.equipo) + '</div><div class="det">' + esc([m.sku, m.imei ? 'IMEI ' + m.imei : '', m.detalle].filter(Boolean).join(' · ')) + '</div></td></tr>';
+      }).join('') + '</table></div>';
+    html += '</section>';
+  }
+
   // 2. Modelos más vistos
   var vs = r.vistos || [];
   html += '<section><h2 class="t">Modelos más vistos (30 días)</h2><p class="nota">Modelos que los clientes abrieron para ver sus equipos, aunque no hayan pedido.</p>';
@@ -507,6 +533,7 @@ function pintar(r){
   }).join('') + '</table>';
   html += '</section>';
   $('app').innerHTML = html;
+  if (bitTexto && $('bitFiltro')) { $('bitFiltro').value = bitTexto; filtrarBitacora(); }
 }
 
 // ===== Mensaje de difusión =====
@@ -577,16 +604,17 @@ function armarEstado(cat, modo, marca){
   var C = {}; cat.columnas.forEach(function(c, i){ C[c] = i; });
   var v = function(f, col){ return C[col] === undefined ? '' : String(f[C[col]] || '').trim(); };
   var ahora = cat.ahora || Date.now(), DIA = 24 * 3600 * 1000;
-  var grupos = {}, orden = [], hayNuevo = false, hayBaja = false;
+  var grupos = {}, orden = [], hayNuevo = false, hayBaja = false, hayOferta = false;
   cat.filas.forEach(function(f, i){
     var mod = v(f,'Modelo'); if (!mod) return;
     if (marca && marcaDe(mod) !== marca) return;
     var precio = aNum(v(f,'Precio Venta'));
     var t = (cat.ingreso && cat.ingreso[i]) || 0, nuevo = !!t && ahora - t < DIA;
-    var antes = aNum(cat.bajas && cat.bajas[i]), baja = antes > 0 && precio > 0 && antes > precio;
-    if ((modo === 'nuevo' && !nuevo) || (modo === 'baja' && !baja) || (modo === 'auto' && !nuevo && !baja)) return;
+    var of = aNum(cat.ofertas && cat.ofertas[i]), oferta = of > 0;
+    var antes = of > 1 ? of : aNum(cat.bajas && cat.bajas[i]), baja = antes > 0 && precio > 0 && antes > precio;
+    if ((modo === 'nuevo' && !nuevo) || (modo === 'baja' && !baja) || (modo === 'oferta' && !oferta) || (modo === 'auto' && !nuevo && !baja && !oferta)) return;
     var cab = mod + ' ' + v(f,'Capacidad');
-    if (!grupos[cab]) { grupos[cab] = { titulo: cab, colores: [], cats: [], unid: 0, min: 0, max: 0, nuevo: false, antes: 0, rebajado: 0 }; orden.push(cab); }
+    if (!grupos[cab]) { grupos[cab] = { titulo: cab, colores: [], cats: [], unid: 0, min: 0, max: 0, nuevo: false, antes: 0, rebajado: 0, oferta: false }; orden.push(cab); }
     var g = grupos[cab];
     var color = v(f,'Color'), cate = v(f,'Categoría');
     if (color && g.colores.indexOf(color) < 0) g.colores.push(color);
@@ -594,13 +622,14 @@ function armarEstado(cat, modo, marca){
     g.unid++;
     if (precio) { g.min = g.min ? Math.min(g.min, precio) : precio; g.max = Math.max(g.max, precio); }
     if (nuevo) { g.nuevo = true; hayNuevo = true; }
+    if (oferta) { g.oferta = true; hayOferta = true; }
     if (baja && (!g.rebajado || antes - precio > g.antes - g.rebajado)) { g.antes = antes; g.rebajado = precio; hayBaja = true; }
   });
   var lista = orden.map(function(k){ return grupos[k]; });
   if (modo === 'todo') lista.sort(function(a, b){ return b.unid - a.unid; });
-  else lista.sort(function(a, b){ return (b.rebajado ? 1 : 0) - (a.rebajado ? 1 : 0); });
-  var titulo = modo === 'todo' ? 'DISPONIBLE HOY'
-    : (hayNuevo && hayBaja) ? 'NUEVO Y REBAJADO' : hayBaja ? 'BAJARON DE PRECIO' : 'RECIÉN LLEGADOS';
+  else lista.sort(function(a, b){ return ((b.oferta ? 2 : 0) + (b.rebajado ? 1 : 0)) - ((a.oferta ? 2 : 0) + (a.rebajado ? 1 : 0)); });
+  var titulo = modo === 'todo' ? 'DISPONIBLE HOY' : modo === 'oferta' ? 'OFERTAS DE LA SEMANA'
+    : (hayOferta && !hayNuevo) ? 'OFERTAS Y REBAJAS' : (hayNuevo && (hayBaja || hayOferta)) ? 'NUEVO Y EN OFERTA' : hayBaja ? 'BAJARON DE PRECIO' : 'RECIÉN LLEGADOS';
   return { grupos: lista, titulo: titulo, unid: lista.reduce(function(s, g){ return s + g.unid; }, 0) };
 }
 function cargarLogo(){
@@ -648,7 +677,7 @@ function dibujarEstado(d, logo){
     c.fillText(ajustar(sub, 590), 96, y + CH - 32);
     // Precio a la derecha
     c.textAlign = 'right'; var xr = W - 96, precio = g.rebajado || g.min;
-    fuente('900', 56); c.fillStyle = g.rebajado ? '#C62828' : '#4B1F7A';
+    fuente('900', 56); c.fillStyle = g.rebajado || g.oferta ? '#C62828' : '#4B1F7A';
     c.fillText(precio ? aDolar(precio) : 'Consultar', xr, y + CH - 30);
     if (!g.rebajado && g.max > g.min) { var pw = c.measureText(aDolar(precio)).width; fuente('600', 26); c.fillStyle = '#6B6475'; c.fillText('desde', xr - pw - 10, y + CH - 32); }
     if (g.rebajado) {
@@ -656,6 +685,10 @@ function dibujarEstado(d, logo){
       c.fillText(at, xr, y + 42);
       var aw = c.measureText(aDolar(g.antes)).width;
       c.strokeStyle = '#C62828'; c.lineWidth = 3; c.beginPath(); c.moveTo(xr - aw - 2, y + 32); c.lineTo(xr + 2, y + 32); c.stroke();
+    } else if (g.oferta) {
+      fuente('800', 24); var ow = c.measureText('OFERTA').width + 28;
+      c.fillStyle = '#D84315'; rr(xr - ow, y + 14, ow, 38, 19); c.fill();
+      c.fillStyle = '#FFFFFF'; c.textAlign = 'center'; c.fillText('OFERTA', xr - ow / 2, y + 42); c.textAlign = 'right';
     } else if (g.nuevo) {
       fuente('800', 24); var nw = c.measureText('NUEVO').width + 28;
       c.fillStyle = '#FFC52E'; rr(xr - nw, y + 14, nw, 38, 19); c.fill();
@@ -697,7 +730,8 @@ $('estGenerar').addEventListener('click', function(){
     var d = armarEstado(cat, modo, $('estMarca').value);
     if (!d.grupos.length) {
       $('estInfo').textContent = modo === 'todo' ? 'No hay equipos disponibles con ese filtro.'
-        : 'No hay equipos ' + (modo === 'baja' ? 'rebajados' : modo === 'nuevo' ? 'recién llegados' : 'recién llegados ni rebajados') +
+        : modo === 'oferta' ? 'No hay equipos en 🔥 oferta ahora. Ponlos en oferta desde el candadito 🔒 del catálogo o con «Aplicar rebaja» en esta página.'
+        : 'No hay equipos ' + (modo === 'baja' ? 'rebajados' : modo === 'nuevo' ? 'recién llegados' : 'recién llegados, rebajados ni en oferta') +
           ' en las últimas 24 horas. Prueba con «Lo más disponible hoy».';
       return;
     }
