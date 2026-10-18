@@ -375,9 +375,9 @@ function pintar(r){
         filas.map(function(x){ return '<tr><td>' + esc(x.nombre) + (x.sinCosto ? '<div class="det">' + x.sinCosto + ' sin costo</div>' : '') + '</td><td class="num">' + x.n + '</td><td class="num">' + m0(x.costo) + '</td><td class="num">' + m0(x.valor) + '</td><td class="num"><span class="pos">' + m0(x.ganancia) + '</span></td></tr>'; }).join('') +
         '</table></div>';
     };
-    html += '<section class="val"><h2 class="t">💼 Valor del inventario</h2><p class="nota">«En tus manos» = Disponible + Reservado + Taller (sin contar lo que viene En tránsito). Invertido = «Costo Total»; Valor = «Precio Venta Mayorista»; Ganancia esperada = Valor − Invertido.</p>' +
+    html += '<section class="val"><h2 class="t">💼 Valor del inventario</h2><p class="nota">Total del inventario = Disponible + Reservado + Taller + En tránsito. Invertido = «Costo Total»; Valor = «Precio Venta Mayorista»; Ganancia esperada = Valor − Invertido.</p>' +
       '<div class="cards">' +
-        card('Equipos en tus manos', mn.n, mn.sinCosto ? mn.sinCosto + ' sin costo registrado' : 'todos con costo') +
+        card('Equipos en inventario', mn.n, mn.sinCosto ? mn.sinCosto + ' sin costo registrado' : 'todos con costo') +
         card('Invertido', m0(mn.costo), 'lo que te costaron') +
         card('Valor a precio mayoreo', m0(mn.valor), 'si vendes todo a precio de lista') +
         card('Ganancia esperada', m0(mn.ganancia), 'margen ' + pc(mn.ganancia, mn.costo) + ' sobre costo') +
