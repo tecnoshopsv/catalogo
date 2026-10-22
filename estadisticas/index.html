@@ -108,6 +108,20 @@
   table.htab{background:#fff;border-radius:8px}
   table.htab td,table.htab th{padding:6px 5px;font-size:13px}
   .gan h2.t{color:#0E6B4E}
+  .metas{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  .meta-c{border:1px solid var(--linea);border-radius:12px;padding:12px 14px;background:#fff}
+  .meta-c .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .meta-c .top b{font-size:15px}
+  .meta-c .num{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+  .meta-c .num small{font-size:13px;font-weight:600;color:var(--suave)}
+  .meta-bar{position:relative;height:14px;background:#EFE7F8;border-radius:7px;overflow:hidden;margin:8px 0 6px}
+  .meta-bar i{display:block;height:100%;background:var(--morado-2);border-radius:7px}
+  .meta-bar i.ok{background:#1B8A5A}
+  .meta-bar i.atras{background:#D9822B}
+  .meta-bar u{position:absolute;top:0;bottom:0;width:2px;background:#1E1A24;opacity:.55}
+  .meta-c .est{font-size:13px;font-weight:700;margin-top:2px}
+  .meta-c .est.ok{color:#11643A}.meta-c .est.atras{color:#A04F0C}
+  .meta-c .det2{font-size:12px;color:var(--suave);margin-top:3px}
   .gan{border-color:#BDEFD0}
   .pos{color:#0E6B4E;font-weight:700}.neg{color:#C62828;font-weight:700}
   .tipos2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
@@ -310,6 +324,29 @@ function apiladas(dias){
 function plural(n, uno, varios){ return n + ' ' + (n === 1 ? uno : varios); }
 function porcentaje(a, b){ return b ? Math.round(a / b * 100) + '%' : '—'; }
 
+// 🎯 Meta del mes: barra de avance por tipo de venta, ritmo esperado y cuánto falta por día
+function metaHtml(m){
+  var MESL = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var mesTxt = MESL[Number(m.mes.slice(5, 7)) - 1];
+  var esperado = m.habiles ? m.pasados / m.habiles : 0;
+  var h = '<section class="gan"><h2 class="t">🎯 Meta de ' + mesTxt + '</h2><p class="nota">Equipos vendidos con el botón «Marcar como Vendido» (las ventas anuladas no cuentan). Días hábiles: lunes a sábado · van ' + m.pasados + ' de ' + m.habiles + '. La rayita negra marca dónde deberían ir hoy.</p>';
+  if (m.desde && m.desde.slice(0, 7) === m.mes && Number(m.desde.slice(8, 10)) > 1)
+    h += '<p class="nota">Las ventas con el botón empezaron el ' + Number(m.desde.slice(8, 10)) + ' de ' + mesTxt + ', así que este mes la meta es proporcional a los días desde esa fecha. Desde el próximo mes es la meta completa' + (m.metaCompleta ? ' (' + Object.keys(m.metaCompleta).map(function(k){ return m.metaCompleta[k] + ' ' + k.toLowerCase(); }).join(' y ') + ')' : '') + '.</p>';
+  h += '<div class="metas">' + m.tipos.map(function(t){
+    var p = t.meta ? t.vendidos / t.meta : 0, falta = Math.max(0, t.meta - t.vendidos);
+    var deberia = Math.round(t.meta * esperado), adelante = t.vendidos >= deberia;
+    var proy = m.pasados ? Math.round(t.vendidos / m.pasados * m.habiles) : 0;
+    var porDia = m.restantes ? Math.ceil(falta / m.restantes * 10) / 10 : falta;
+    var est = t.vendidos >= t.meta ? '<div class="est ok">🎉 ¡Meta cumplida!' + (t.vendidos > t.meta ? ' +' + (t.vendidos - t.meta) + ' de más' : '') + '</div>'
+      : adelante ? '<div class="est ok">✔ Van bien: hoy deberían llevar ' + deberia + '</div>'
+      : '<div class="est atras">⚠ Van atrasados: hoy deberían llevar ' + deberia + ' (faltan ' + (deberia - t.vendidos) + ')</div>';
+    return '<div class="meta-c"><div class="top"><b>' + esc(t.tipo) + '</b><span class="num">' + t.vendidos + ' <small>de ' + t.meta + '</small></span></div>' +
+      '<div class="meta-bar"><i class="' + (t.vendidos >= t.meta || adelante ? 'ok' : 'atras') + '" style="width:' + Math.min(100, Math.round(p * 100)) + '%"></i><u style="left:' + Math.min(100, Math.round(esperado * 100)) + '%"></u></div>' + est +
+      (t.vendidos < t.meta ? '<div class="det2">Faltan ' + falta + ' · necesitan ~' + porDia + ' por día en los ' + m.restantes + ' días hábiles que quedan</div>' : '') +
+      '<div class="det2">' + Math.round(p * 100) + '% de la meta' + (m.pasados && t.vendidos < t.meta ? ' · a este ritmo cerrarían el mes con ~' + proy : '') + ' · mes anterior: ' + t.mesAnterior + '</div></div>';
+  }).join('') + '</div></section>';
+  return h;
+}
 function pintar(r){
   $('gen').textContent = 'Actualizado ' + r.generado + ' · se actualiza solo cada minuto';
   var h = r.hoy, c = r.clientes30 || { visitantes:0, nuevos:0, regresan:0, compradores:0 };
@@ -322,6 +359,7 @@ function pintar(r){
 
   // Ventas y ganancias (ventas registradas con "Marcar como Vendido")
   var g = r.ganancias;
+  if (g && !g.error && g.meta) html += metaHtml(g.meta);
   if (g && g.error) html += '<div class="err">No se pudieron calcular las ganancias: ' + esc(g.error) + '</div>';
   if (g && !g.error) {
     var MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
