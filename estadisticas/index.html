@@ -134,6 +134,8 @@
 .mesTot td{border-top:2px solid rgba(127,127,127,.35)}
 .mesCanal td{font-size:.88em;opacity:.85}
 .canalSub{display:inline-block;padding-left:12px}
+.barras.anual{height:170px}
+.apilada.hoy{box-shadow:0 0 0 2px var(--morado)}
 </style>
 </head>
 <body>
@@ -399,6 +401,30 @@ function pintar(r){
         return card(x.tipo, dinero(x.ganancia), x.unidades + ' equipos · ventas ' + d0(x.ventas) + ' · margen ' + pct(x.margen));
       }).join('') + '</div>';
       var faltan = gt.sinCosto ? '<div class="det" style="margin-top:6px">' + plural(gt.sinCosto, 'venta no tiene', 'ventas no tienen') + ' «Costo Total» en el Inventario Interno y no suman a la ganancia.</div>' : '';
+      // Gráficos anuales: ganancia y equipos vendidos por mes del año en curso, separados por canal
+      var anio = String(g.mesActual).slice(0, 4), MES3 = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      var porClave = {}; (g.porMes || []).forEach(function(x){ porClave[x.mes] = x; });
+      var anual = MES3.map(function(n, i){
+        var k = anio + '-' + ('0' + (i + 1)).slice(-2), x = porClave[k];
+        var de = function(t){ return (x && x.tipos) ? (x.tipos.filter(function(z){ return z.tipo === t; })[0] || null) : null; };
+        return { n: n, k: k, may: de('Mayoreo'), cf: de('Consumidor final'), x: x };
+      });
+      var corto = function(v){ var a = Math.abs(v); return a >= 10000 ? '$' + Math.round(v / 1000) + 'k' : a >= 1000 ? '$' + (v / 1000).toFixed(1).replace('.0', '') + 'k' : '$' + Math.round(v); };
+      var grafAnual = function(titulo, campo, fmt, fmtTip){
+        var val = function(y){ return y ? Math.max(0, y[campo] || 0) : 0; };
+        var max = Math.max.apply(null, anual.map(function(a){ return val(a.may) + val(a.cf); }).concat([1]));
+        return '<h3 class="sub">' + titulo + ' · ' + anio + '</h3><div class="barras anual">' + anual.map(function(a){
+          var m = val(a.may), c = val(a.cf), tot = a.x ? (a.x[campo] || 0) : 0;
+          return '<div class="col" title="' + a.n + ' ' + anio + ' · Mayoreo ' + fmtTip(m) + ' · Consumidor final ' + fmtTip(c) + '">' +
+            '<div class="n">' + (tot ? fmt(tot) : '') + '</div>' +
+            '<div class="apilada' + (a.k === g.mesActual ? ' hoy' : '') + '" style="height:' + ((m + c) / max * 100) + '%">' +
+            '<div class="r" style="flex:' + m + '"></div><div class="nv" style="flex:' + c + '"></div></div>' +
+            '<div class="e">' + a.n + '</div></div>';
+        }).join('') + '</div>';
+      };
+      html += grafAnual('Ganancia por mes', 'ganancia', corto, d0) +
+        grafAnual('Equipos vendidos por mes', 'unidades', function(n){ return String(n); }, function(n){ return n + ' eq.'; }) +
+        '<div class="leyenda"><span><i style="background:var(--morado-2)"></i>Mayoreo</span><span><i style="background:var(--amarillo)"></i>Consumidor final</span><span>Toca o pasa el mouse sobre una barra para ver el detalle</span></div>';
       html += '<h3 class="sub">Por mes</h3><div class="tscroll"><table><tr><th>Mes</th><th class="num">Equipos</th><th class="num">Ventas</th><th class="num">Costo</th><th class="num">Ganancia</th><th class="num">Margen</th></tr>' +
         g.porMes.map(function(x){
           var fila = function(nom, y, cls){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + nom + '</td><td class="num">' + y.unidades + '</td><td class="num">' + d0(y.ventas) + '</td><td class="num">' + d0(y.costo) + '</td><td class="num">' + gan(y.ganancia) + '</td><td class="num">' + pct(y.margen) + '</td></tr>'; };
