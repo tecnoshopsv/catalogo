@@ -387,7 +387,7 @@ function pintar(r){
         html += '<h3 class="sub">Este mes por canal</h3><div class="tipos2">' + pm0.tipos.map(function(x){
           var a = (ant && ant.tipos) ? ant.tipos.filter(function(y){ return y.tipo === x.tipo; })[0] : null;
           var comp = '';
-          if (a) {
+          if (a && a.unidades) {
             var dif = x.ganancia - a.ganancia;
             comp = ' · ' + (dif >= 0 ? '▲ ' : '▼ ') + d0(Math.abs(dif)) + ' vs. ' + nomMes(ant.mes) + ' al día ' + ant.dia + ' (' + d0(a.ganancia) + ')';
           }
